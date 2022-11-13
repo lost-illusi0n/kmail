@@ -1,30 +1,18 @@
-package dev.sitar.kmail.smtp.io
+package dev.sitar.kmail.smtp.io.smtp.reader
 
 import dev.sitar.kio.async.readers.AsyncReader
 import dev.sitar.kmail.smtp.*
+import dev.sitar.kmail.smtp.io.readStringUtf8
+import dev.sitar.kmail.smtp.io.readUtf8StringUntil
 
-public class AsyncSmtpReader(public val reader: AsyncReader) : AsyncReader by reader {
-    public suspend fun readUtf8UntilSmtpEnding(): String {
-        var lastChar = ' '
-
-        return readUtf8StringUntil {
-            val isEnding = lastChar == '\r' && it == '\n'
-            lastChar = it
-            isEnding
-        }.dropLast(1)
-    }
-
-    public suspend fun readIsFinal(): Boolean {
-        return read() == ' '.code.toByte()
-    }
-
+public class AsyncSmtpClientReader(reader: AsyncReader) : AsyncSmtpReader, AsyncReader by reader {
     public suspend fun readSmtpCode(): Int {
         return readStringUtf8(3).toInt()
     }
 
     // TODO: instead of always expecting T (a good result), take a map (status code -> expected reply)
     public suspend inline fun <reified T : SmtpReply> readSmtpReply(): T {
-        return when (readSmtpCode()) {
+        return when (val code = readSmtpCode()) {
             220 -> GreetReply.Serializer.deserialize(this) as T
             221 -> OkReply.Serializer.deserialize(this) as T
             250 -> {
@@ -35,11 +23,11 @@ public class AsyncSmtpReader(public val reader: AsyncReader) : AsyncReader by re
                 }
             }
             354 -> StartMailInputReply.Serializer.deserialize(this) as T
-            else -> TODO()
+            else -> error("missing reply $code: ${readUtf8UntilSmtpEnding()}")
         }
     }
 }
 
-public fun AsyncReader.asAsyncSmtpReader(): AsyncSmtpReader {
-    return AsyncSmtpReader(this)
+public fun AsyncReader.asAsyncSmtpClientReader(): AsyncSmtpClientReader {
+    return AsyncSmtpClientReader(this)
 }

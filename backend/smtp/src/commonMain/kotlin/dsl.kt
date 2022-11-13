@@ -18,7 +18,7 @@ public class MessageBuilder(
     public var keywords: MutableList<String> = mutableListOf()
     public var to: String? = null
 
-    public var content: String? = null
+    public var body: String? = null
 
     public fun toMessage(): MessageCommand {
         return MessageCommand(
@@ -29,7 +29,7 @@ public class MessageBuilder(
                     (if (subject != null) "Subject:$subject\r\n" else "") +
                     (if (comments != null) "Comments:$comments\r\n" else "") +
                     (if (keywords.isNotEmpty()) "Keywords:${keywords.joinToString(",")}\r\n" else "") +
-                    (content ?: "") +
+                    (body ?: "") +
                     "\r\n"
         )
     }
