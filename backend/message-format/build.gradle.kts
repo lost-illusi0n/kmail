@@ -8,13 +8,10 @@ repositories {
 
 kotlin {
     jvm()
-
-    explicitApi()
+//    linuxX64()
 
     sourceSets["commonMain"].dependencies {
-        api(project(":message-format"))
         implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-        implementation("io.ktor:ktor-network:2.1.3")
-        implementation("dev.sitar:kio:1.1.0")
+        implementation("dev.sitar:kio")
     }
 }

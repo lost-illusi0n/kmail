@@ -1,5 +1,10 @@
 package dev.sitar.kmail.smtp
 
+import dev.sitar.kmail.message.headers.from
+import dev.sitar.kmail.message.headers.originalDate
+import dev.sitar.kmail.message.headers.subject
+import dev.sitar.kmail.message.headers.toRcpt
+import dev.sitar.kmail.message.message
 import dev.sitar.kmail.smtp.io.*
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpClientReader
@@ -10,11 +15,13 @@ import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.datetime.Clock
+import kotlinx.datetime.UtcOffset
 import kotlin.system.exitProcess
 
 private const val SMTP_SERVER = "localhost"
 private const val OUR_HOST = "linux.org"
-private const val RECIPIENT = "enter-recipient-here"
+private const val RECIPIENT = "marco@sitar.dev"
 
 private suspend fun main(): Unit = coroutineScope {
     val transport = aSocket(SelectorManager(Dispatchers.Default)).tcp().connect(SMTP_SERVER, 587)
@@ -36,12 +43,18 @@ private suspend fun main(): Unit = coroutineScope {
     send(writer, DataCommand)
     got<StartMailInputReply>(reader)
 
-    send(writer, message(from = "Zuzana Caputova <zuzana@spoofed.com>", host = OUR_HOST) {
-        to = RECIPIENT
+    send(writer, MailInputCommand(message {
+        headers {
+            +from("Marco <marco@sitar.com>")
+            +toRcpt("<marco@sitar.dev>")
+            +originalDate(Clock.System.now(), UtcOffset(-5))
+            +subject("message format rewrite")
+        }
 
-        subject = "a kotlin subject"
-        body = "hey, from kotlin.\r\n"
-    })
+        body {
+            line("hello")
+        }
+    }))
     got<OkReply>(reader)
 
     send(writer, QuitCommand)

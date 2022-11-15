@@ -1,11 +1,9 @@
 package dev.sitar.kmail.smtp
 
-import dev.sitar.kio.async.writers.AsyncWriter
-import dev.sitar.kio.buffers.Buffer
 import dev.sitar.kio.buffers.DefaultBufferPool
-import dev.sitar.kio.buffers.buffer
 import dev.sitar.kio.fullSlice
 import dev.sitar.kio.use
+import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpWriter
 import dev.sitar.kmail.smtp.io.writeStringUtf8
@@ -110,19 +108,23 @@ public object DataCommand : SmtpCommand {
             return DataCommand
         }
     }
+
+    override fun toString(): String {
+        return "DataCommand"
+    }
 }
 
-public data class MessageCommand(val message: String) : SmtpCommand {
+public data class MailInputCommand(val message: Message) : SmtpCommand {
     public object Serializer {
         private val TERMINATING_SEQUENCE = "\r\n.\r\n".toByteArray().fullSlice()
 
-        public suspend fun serialize(command: MessageCommand, output: AsyncSmtpWriter) {
-            output.writeStringUtf8(command.message)
+        public suspend fun serialize(command: MailInputCommand, output: AsyncSmtpWriter) {
+            output.writeStringUtf8(command.message.asText())
             output.write('.'.code.toByte())
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader) : MessageCommand {
+        public suspend fun deserialize(input: AsyncSmtpReader) : MailInputCommand {
             val data: ByteArray = DefaultBufferPool.use(32) { resultBuffer ->
                 for (byte in input) {
                     resultBuffer.write(byte)
@@ -131,7 +133,7 @@ public data class MessageCommand(val message: String) : SmtpCommand {
 
                     // check if terminating sequence is found at the end of the result buffer
                     if (lastFive.contentEquals(TERMINATING_SEQUENCE)) {
-                        resultBuffer.writeIndex -= 5
+                        resultBuffer.writeIndex -= 3 // the first <CRLF> is part of the body. don't need to remove it
                         return@use resultBuffer.toByteArray()
                     }
                 }
@@ -139,7 +141,7 @@ public data class MessageCommand(val message: String) : SmtpCommand {
                 TODO("input stopped but terminating sequence not found after data")
             }
 
-            return MessageCommand(data.decodeToString())
+            return MailInputCommand(Message.fromText(data.decodeToString()))
         }
     }
 
@@ -159,4 +161,8 @@ public object QuitCommand : SmtpCommand {
     }
 
     override val discriminator: String = "QUIT"
+
+    override fun toString(): String {
+        return "QuitCommand"
+    }
 }

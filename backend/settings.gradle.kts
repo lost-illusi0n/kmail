@@ -3,6 +3,7 @@ rootProject.name = "kmail"
 
 include("imap")
 include("smtp")
+include("message-format")
 
 include("smtp-agent")
 

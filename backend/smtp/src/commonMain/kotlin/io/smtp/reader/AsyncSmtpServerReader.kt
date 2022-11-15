@@ -12,7 +12,7 @@ public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, Async
     // TODO: instead of always expecting T (a good result), take a map (status code -> expected reply)
     public suspend inline fun <reified T : SmtpCommand> readSmtpCommand(): T {
         // a message is not a real command. take care of it special
-        if (T::class == MessageCommand::class) return MessageCommand.Serializer.deserialize(this) as T
+        if (T::class == MailInputCommand::class) return MailInputCommand.Serializer.deserialize(this) as T
 
         return when (val command = readSmtpCommandKey()) {
             "EHLO" -> EhloCommand.Serializer.deserialize(this) as T

@@ -106,4 +106,8 @@ public object StartMailInputReply: SmtpReply {
             return StartMailInputReply
         }
     }
+
+    override fun toString(): String {
+        return "StartMailInputReply"
+    }
 }

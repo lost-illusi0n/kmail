@@ -1,5 +1,6 @@
 package dev.sitar.kmail.smtp.agent
 
+import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpServerReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpServerReader
@@ -35,9 +36,9 @@ class SubmissionAgent private constructor(
 
     private val coroutineScope = CoroutineScope(coroutineContext + SupervisorJob() + CoroutineName("SUBMISSION-AGENT"))
 
-    private val _incomingMail: Channel<Message> = Channel()
+    private val _incomingMail: Channel<InternetMessage> = Channel()
 
-    val incomingMail: Flow<Message> = _incomingMail.consumeAsFlow()
+    val incomingMail: Flow<InternetMessage> = _incomingMail.consumeAsFlow()
     suspend fun start() = coroutineScope {
         while (isActive) {
             val socket = socket.accept()
@@ -93,14 +94,13 @@ class SubmissionAgent private constructor(
             recv<DataCommand>()
             send(354, StartMailInputReply)
 
-            val messageCommand = recv<MessageCommand>()
+            val mailInput = recv<MailInputCommand>()
+            val internetMessage = InternetMessage(Envelope(mail.from, rcpt.to), mailInput.message)
+            _incomingMail.send(internetMessage)
 
-            val message = Message(ehlo, mail, rcpt, messageCommand)
-            _incomingMail.send(message)
+            println("QUEUED MESSAGE ${internetMessage.queueId}")
 
-            println("QUEUED MESSAGE ${message.queueId}")
-
-            send(221, OkReply("Queued as ${message.queueId}"))
+            send(221, OkReply("Queued as ${internetMessage.queueId}"))
 
             // TODO: this should be a state machine and the client should be able to make a new mail or quit.
             recv<QuitCommand>()

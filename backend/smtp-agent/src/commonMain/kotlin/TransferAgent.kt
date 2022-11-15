@@ -22,13 +22,13 @@ import kotlin.coroutines.coroutineContext
 
 class TransferAgent private constructor(
     val data: SmtpServerData,
-    val outgoingMessages: Flow<Message>,
+    val outgoingMessages: Flow<InternetMessage>,
     coroutineContext: CoroutineContext
 ) {
     companion object {
         private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
 
-        suspend fun fromOutgoingMessages(hostname: String, outgoingMessages: Flow<Message>): TransferAgent {
+        suspend fun fromOutgoingMessages(hostname: String, outgoingMessages: Flow<InternetMessage>): TransferAgent {
             return TransferAgent(SmtpServerData(hostname), outgoingMessages, coroutineContext)
         }
     }
@@ -42,7 +42,7 @@ class TransferAgent private constructor(
     }
 
     private data class TransferSession(
-        val message: Message,
+        val message: InternetMessage,
         var exchange: String?,
     ) {
         lateinit var reader: AsyncSmtpClientReader
@@ -68,13 +68,14 @@ class TransferAgent private constructor(
     }
 
     // TODO: error handling. e.g. incorrect host/message recipient syntax
-    private suspend fun transfer(message: Message) {
-        val session = TransferSession(message, null)
+    private suspend fun transfer(mail: InternetMessage) {
+        val session = TransferSession(mail, null)
 
         with (session) {
-            println("MESSAGE (${message.queueId}) READY FOR TRANSFER")
+            println("MESSAGE (${mail.queueId}) READY FOR TRANSFER")
 
-            val host = message.rcpt.to.split('@')[1].removeSuffix(">")
+            // TODO: make this robust
+            val host = mail.envelope.recipientAddress.split('@')[1].removeSuffix(">")
 
             println("RESOLVING HOST $host")
 
@@ -95,16 +96,16 @@ class TransferAgent private constructor(
             send(EhloCommand(data.host))
             recv<EhloReply>()
 
-            send(message.mail)
+            send(MailCommand(mail.envelope.originatorAddress))
             recv<OkReply>()
 
-            send(message.rcpt)
+            send(RecipientCommand(mail.envelope.recipientAddress))
             recv<OkReply>()
 
             send(DataCommand)
             recv<StartMailInputReply>()
 
-            send(message.message)
+            send(MailInputCommand(mail.message))
             recv<OkReply>()
 
             send(QuitCommand)
