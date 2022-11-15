@@ -65,11 +65,10 @@ public data class EhloReply(val domain: String, val greet: String?, val lines: M
 
                 isFinal = input.readIsFinal()
 
-                val keywordAndParam = input.readUtf8UntilSmtpEnding().split(' ')
-                val (keyword, param) = when (keywordAndParam.size) {
-                    1 -> Pair(keywordAndParam[0], null)
-                    2 -> Pair(keywordAndParam[0], keywordAndParam[1])
-                    else -> error("cannot parse ehlo reply")
+                val keywordAndParam = input.readUtf8UntilSmtpEnding()
+                val (keyword, param) = when (val index = keywordAndParam.indexOf(' ')) {
+                    -1 -> Pair(keywordAndParam, null)
+                    else -> Pair(keywordAndParam.substring(0..index), keywordAndParam.substring(index))
                 }
 
                 lines[keyword] = param

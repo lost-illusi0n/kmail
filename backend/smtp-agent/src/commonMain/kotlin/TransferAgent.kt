@@ -5,6 +5,9 @@ import dev.sitar.dns.records.MXResourceRecord
 import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
 import dev.sitar.kmail.smtp.*
+import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportClient
+import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
+import dev.sitar.kmail.smtp.agent.transports.client.SmtpsTransportClient
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpClientWriter
@@ -22,14 +25,15 @@ import kotlin.coroutines.coroutineContext
 
 class TransferAgent private constructor(
     val data: SmtpServerData,
+    val client: SmtpTransportClient,
     val outgoingMessages: Flow<InternetMessage>,
     coroutineContext: CoroutineContext
 ) {
     companion object {
         private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
 
-        suspend fun fromOutgoingMessages(hostname: String, outgoingMessages: Flow<InternetMessage>): TransferAgent {
-            return TransferAgent(SmtpServerData(hostname), outgoingMessages, coroutineContext)
+        suspend fun fromOutgoingMessages(hostname: String, outgoingMessages: Flow<InternetMessage>, client: SmtpTransportClient = SmtpsTransportClient): TransferAgent {
+            return TransferAgent(SmtpServerData(hostname), client, outgoingMessages, coroutineContext)
         }
     }
 
@@ -45,8 +49,10 @@ class TransferAgent private constructor(
         val message: InternetMessage,
         var exchange: String?,
     ) {
-        lateinit var reader: AsyncSmtpClientReader
-        lateinit var writer: AsyncSmtpClientWriter
+        lateinit var connection: SmtpTransportConnection
+
+        val reader: AsyncSmtpClientReader by lazy { connection.reader.asAsyncSmtpClientReader() }
+        val writer: AsyncSmtpClientWriter by lazy { connection.writer.asAsyncSmtpClientWriter() }
 
         fun println(content: String) {
             kotlin.io.println("TRANSFER (${message.queueId}/$exchange): $content")
@@ -84,12 +90,12 @@ class TransferAgent private constructor(
             }
 
             println("RESOLVED ${response.orEmpty().size} MX RECORDS")
+            println(response.toString())
 
-            exchange = response.orEmpty().filterIsInstance<MXResourceRecord>().minBy { it.data.preference }.data.exchange
+            exchange = response.orEmpty().filterIsInstance<MXResourceRecord>().sortedBy { it.data.preference }[2].data.exchange
 
-            val transferSocket = aSocket(SelectorManager(Dispatchers.Default)).tcp().connect(exchange!!, port = 25)
-            reader = transferSocket.openReadChannel().toAsyncByteReadChannelReader().asAsyncSmtpClientReader()
-            writer = transferSocket.openWriteChannel().toAsyncByteChannelWriter().asAsyncSmtpClientWriter()
+            // TODO: try every exchange over the two standard ports (587 and 25).
+            connection = client.connect(exchange!!)
 
             recv<GreetReply>()
 

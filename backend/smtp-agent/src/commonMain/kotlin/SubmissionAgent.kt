@@ -2,6 +2,12 @@ package dev.sitar.kmail.smtp.agent
 
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
+import dev.sitar.kmail.smtp.agent.transports.client.PlainTextSmtpTransportClient
+import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
+import dev.sitar.kmail.smtp.agent.transports.client.SmtpsTransportClient
+import dev.sitar.kmail.smtp.agent.transports.server.PlainTextSmtpServerTransportClient
+import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
+import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportConnection
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpServerReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpServerReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpServerWriter
@@ -21,16 +27,16 @@ import kotlin.coroutines.coroutineContext
 // TODO: transport encryption
 class SubmissionAgent private constructor(
     val data: SmtpServerData,
-    val socket: ServerSocket,
+    val server: SmtpServerTransportConnection,
     coroutineContext: CoroutineContext
 ) {
     companion object {
         // TODO: we should take some extra information to better process incoming messages as a msu
-        suspend fun withHostname(host: String): SubmissionAgent {
-            val submissionSocket = aSocket(SelectorManager(Dispatchers.Default)).tcp().bind(port = 587)
-            println("SUBMISSION: STARTED LISTENING ON PORT 587")
+        suspend fun withHostname(host: String, client: SmtpServerTransportClient = PlainTextSmtpServerTransportClient): SubmissionAgent {
+            val connection = client.bind()
+            println("SUBMISSION: STARTED LISTENING")
 
-            return SubmissionAgent(SmtpServerData(host), submissionSocket, coroutineContext)
+            return SubmissionAgent(SmtpServerData(host), connection, coroutineContext)
         }
     }
 
@@ -41,23 +47,24 @@ class SubmissionAgent private constructor(
     val incomingMail: Flow<InternetMessage> = _incomingMail.consumeAsFlow()
     suspend fun start() = coroutineScope {
         while (isActive) {
-            val socket = socket.accept()
+            val socket = server.accept()
 
             launch { listen(socket) }
         }
     }
 
     private data class SubmissionSession(
-        val remoteAddress: SocketAddress,
-        val reader: AsyncSmtpServerReader,
-        val writer: AsyncSmtpServerWriter,
+        val connection: SmtpTransportConnection
     ) {
+        val reader = connection.reader.asAsyncSmtpServerReader()
+        val writer = connection.writer.asAsyncSmtpServerWriter()
+
         fun println(message: String) {
-            kotlin.io.println("SUBMISSION(${remoteAddress}): $message")
+            kotlin.io.println("SUBMISSION(${connection.remote}): $message")
         }
 
         suspend inline fun <reified T: SmtpReply> send(status: Int, reply: T) {
-            kotlin.io.println("SUBMISSION(${remoteAddress}) >>> $reply")
+            kotlin.io.println("SUBMISSION(${connection.remote}) >>> $reply")
 
             writer.writeReply(status, reply)
         }
@@ -65,19 +72,16 @@ class SubmissionAgent private constructor(
         suspend inline fun <reified T: SmtpCommand> recv(): T {
             val resp = reader.readSmtpCommand<T>()
 
-            kotlin.io.println("SUBMISSION(${remoteAddress}) >>> $resp")
+            kotlin.io.println("SUBMISSION(${connection.remote}) >>> $resp")
 
             return resp
         }
     }
 
-    private suspend fun listen(socket: Socket) {
-        println("ACCEPTED A CONNECTION FROM ${socket.remoteAddress}")
+    private suspend fun listen(transport: SmtpTransportConnection) {
+        println("ACCEPTED A CONNECTION FROM ${transport.remote}")
 
-        val reader = socket.openReadChannel().toAsyncByteReadChannelReader().asAsyncSmtpServerReader()
-        val writer = socket.openWriteChannel().toAsyncByteChannelWriter().asAsyncSmtpServerWriter()
-
-        val session = SubmissionSession(socket.remoteAddress, reader, writer)
+        val session = SubmissionSession(transport)
 
         with (session) {
             send(220, GreetReply("Hello, I am Kmail!"))
@@ -106,7 +110,7 @@ class SubmissionAgent private constructor(
             recv<QuitCommand>()
             send(221, OkReply("Goodbye."))
 
-            socket.close()
+            connection.close()
         }
     }
 }

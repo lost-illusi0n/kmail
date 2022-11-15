@@ -21,10 +21,10 @@ import kotlin.system.exitProcess
 
 private const val SMTP_SERVER = "localhost"
 private const val OUR_HOST = "linux.org"
-private const val RECIPIENT = "marco@sitar.dev"
+private const val RECIPIENT = "example@example.com"
 
 private suspend fun main(): Unit = coroutineScope {
-    val transport = aSocket(SelectorManager(Dispatchers.Default)).tcp().connect(SMTP_SERVER, 587)
+    val transport = aSocket(SelectorManager(Dispatchers.Default)).tcp().connect(SMTP_SERVER, 25)
 
     val reader = transport.openReadChannel().toAsyncByteReadChannelReader().asAsyncSmtpClientReader()
     val writer = transport.openWriteChannel().toAsyncByteChannelWriter().asAsyncSmtpClientWriter()
@@ -34,7 +34,7 @@ private suspend fun main(): Unit = coroutineScope {
     send(writer, EhloCommand(OUR_HOST))
     got<EhloReply>(reader)
 
-    send(writer, MailCommand("zuzana@spoofed.com"))
+    send(writer, MailCommand("<zuzana@spoofed.com>"))
     got<OkReply>(reader)
 
     send(writer, RecipientCommand(RECIPIENT))
@@ -45,8 +45,8 @@ private suspend fun main(): Unit = coroutineScope {
 
     send(writer, MailInputCommand(message {
         headers {
-            +from("Marco <marco@sitar.com>")
-            +toRcpt("<marco@sitar.dev>")
+            +from("Example <example.example.com>")
+            +toRcpt("<$RECIPIENT>")
             +originalDate(Clock.System.now(), UtcOffset(-5))
             +subject("message format rewrite")
         }

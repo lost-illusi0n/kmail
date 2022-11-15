@@ -51,13 +51,14 @@ public data class EhloCommand(val data: String) : SmtpCommand {
     }
 }
 
+// TODO: parse and check to and from. there is a syntax they should follow
 public data class MailCommand(val from: String /* params */) : SmtpCommand {
     override val discriminator: String = "MAIL"
 
     public object Serializer {
         public suspend fun serialize(command: MailCommand, output: AsyncSmtpWriter) {
             output.writeIsFinal()
-            output.writeStringUtf8("FROM:<${command.from}>")
+            output.writeStringUtf8("FROM:${command.from}")
             output.endLine()
         }
 
@@ -79,7 +80,7 @@ public data class RecipientCommand(val to: String /* params */) : SmtpCommand {
     public object Serializer {
         public suspend fun serialize(command: RecipientCommand, output: AsyncSmtpWriter) {
             output.writeIsFinal()
-            output.writeStringUtf8("TO:<${command.to}>")
+            output.writeStringUtf8("TO:${command.to}")
             output.endLine()
         }
 
