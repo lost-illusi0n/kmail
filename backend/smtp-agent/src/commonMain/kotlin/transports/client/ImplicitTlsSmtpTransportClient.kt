@@ -6,8 +6,8 @@ import io.ktor.network.tls.*
 import kotlinx.coroutines.Dispatchers
 import kotlin.coroutines.coroutineContext
 
-object SmtpsTransportClient : SmtpSocketTransportClient {
-    const val IMPLICIT_SMTPS_PORT = 587
+object ImplicitTlsSmtpTransportClient : SmtpSocketTransportClient {
+    const val IMPLICIT_SMTPS_PORT = 465
 
     override suspend fun fromConnectedSocket(socket: Socket): SmtpTransportConnection {
         return SmtpSocketTransportConnection(socket.tls(coroutineContext))

@@ -6,6 +6,7 @@ import dev.sitar.kmail.smtp.io.AsyncByteWriteChannelWriter
 import dev.sitar.kmail.smtp.io.toAsyncByteChannelWriter
 import dev.sitar.kmail.smtp.io.toAsyncByteReadChannelReader
 import io.ktor.network.sockets.*
+import io.ktor.utils.io.*
 
 class SmtpSocketTransportConnection(private val socket: Socket): SmtpTransportConnection {
     override val remote: String = socket.remoteAddress.toString()

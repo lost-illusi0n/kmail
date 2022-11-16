@@ -1,21 +1,12 @@
 package dev.sitar.kmail.smtp.agent
 
-import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
-import dev.sitar.kmail.smtp.agent.transports.client.PlainTextSmtpTransportClient
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
-import dev.sitar.kmail.smtp.agent.transports.client.SmtpsTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.PlainTextSmtpServerTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportConnection
-import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpServerReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpServerReader
-import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpServerWriter
 import dev.sitar.kmail.smtp.io.smtp.writer.asAsyncSmtpServerWriter
-import dev.sitar.kmail.smtp.io.toAsyncByteChannelWriter
-import dev.sitar.kmail.smtp.io.toAsyncByteReadChannelReader
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

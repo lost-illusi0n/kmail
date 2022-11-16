@@ -5,17 +5,11 @@ import dev.sitar.dns.records.MXResourceRecord
 import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
 import dev.sitar.kmail.smtp.*
-import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportClient
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
-import dev.sitar.kmail.smtp.agent.transports.client.SmtpsTransportClient
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpClientWriter
 import dev.sitar.kmail.smtp.io.smtp.writer.asAsyncSmtpClientWriter
-import dev.sitar.kmail.smtp.io.toAsyncByteChannelWriter
-import dev.sitar.kmail.smtp.io.toAsyncByteReadChannelReader
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
@@ -25,15 +19,15 @@ import kotlin.coroutines.coroutineContext
 
 class TransferAgent private constructor(
     val data: SmtpServerData,
-    val client: SmtpTransportClient,
+    val connector: SmtpServerConnector,
     val outgoingMessages: Flow<InternetMessage>,
     coroutineContext: CoroutineContext
 ) {
     companion object {
         private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
 
-        suspend fun fromOutgoingMessages(hostname: String, outgoingMessages: Flow<InternetMessage>, client: SmtpTransportClient = SmtpsTransportClient): TransferAgent {
-            return TransferAgent(SmtpServerData(hostname), client, outgoingMessages, coroutineContext)
+        suspend fun fromOutgoingMessages(hostname: String, outgoingMessages: Flow<InternetMessage>, connector: SmtpServerConnector = DefaultTransferSmtpConnector()): TransferAgent {
+            return TransferAgent(SmtpServerData(hostname), connector, outgoingMessages, coroutineContext)
         }
     }
 
@@ -73,6 +67,7 @@ class TransferAgent private constructor(
         }
     }
 
+    // TODO: STARTTLS
     // TODO: error handling. e.g. incorrect host/message recipient syntax
     private suspend fun transfer(mail: InternetMessage) {
         val session = TransferSession(mail, null)
@@ -92,10 +87,16 @@ class TransferAgent private constructor(
             println("RESOLVED ${response.orEmpty().size} MX RECORDS")
             println(response.toString())
 
-            exchange = response.orEmpty().filterIsInstance<MXResourceRecord>().sortedBy { it.data.preference }[2].data.exchange
+            response.orEmpty()
+                .filterIsInstance<MXResourceRecord>()
+                .sortedBy { it.data.preference }
+                .firstNotNullOfOrNull { connector.connect(it.data.exchange)?.run { it.data.exchange to this } }
+                ?.let { (exchange, connection) ->
+                    this.exchange = exchange
+                    this.connection = connection
+                } ?: TODO("could not connect to any exchange servers")
 
-            // TODO: try every exchange over the two standard ports (587 and 25).
-            connection = client.connect(exchange!!)
+            connection = connector.connect(exchange!!) ?: error("no mx records work")
 
             recv<GreetReply>()
 
