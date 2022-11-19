@@ -6,6 +6,11 @@ import dev.sitar.kmail.smtp.io.AsyncByteWriteChannelWriter
 interface SmtpTransportConnection {
     val remote: String
 
+    val isImplicitlyEncrypted: Boolean
+        get() = false
+
+    suspend fun upgradeToTls()
+
     val reader: AsyncByteReadChannelReader
     val writer: AsyncByteWriteChannelWriter
 

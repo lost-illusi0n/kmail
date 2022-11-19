@@ -10,7 +10,7 @@ object ImplicitTlsSmtpTransportClient : SmtpSocketTransportClient {
     const val IMPLICIT_SMTPS_PORT = 465
 
     override suspend fun fromConnectedSocket(socket: Socket): SmtpTransportConnection {
-        return SmtpSocketTransportConnection(socket.tls(coroutineContext))
+        return SmtpSocketTransportConnection(socket.tls(coroutineContext), isImplicitlyEncrypted = true)
     }
 
     override suspend fun connect(server: String): SmtpTransportConnection {

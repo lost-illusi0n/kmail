@@ -11,13 +11,13 @@ import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpClientWriter
 import dev.sitar.kmail.smtp.io.smtp.writer.asAsyncSmtpClientWriter
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlin.contracts.ExperimentalContracts
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
@@ -49,14 +49,19 @@ class TransferAgent private constructor(
     ) {
         lateinit var connection: SmtpTransportConnection
 
-        val reader: AsyncSmtpClientReader by lazy { connection.reader.asAsyncSmtpClientReader() }
-        val writer: AsyncSmtpClientWriter by lazy { connection.writer.asAsyncSmtpClientWriter() }
+        lateinit var reader: AsyncSmtpClientReader
+        lateinit var writer: AsyncSmtpClientWriter
+
+        fun updateChannels() {
+            reader = connection.reader.asAsyncSmtpClientReader()
+            writer = connection.writer.asAsyncSmtpClientWriter()
+        }
 
         fun println(content: String) {
             kotlin.io.println("TRANSFER (${message.queueId}/$exchange): $content")
         }
 
-        suspend inline fun <reified T: SmtpCommand> send(command: T) {
+        suspend inline fun <reified T : SmtpCommand> send(command: T) {
             kotlin.io.println("TRANSFER (${message.queueId}/$exchange) >>> $command")
 
             writer.writeCommand(command)
@@ -117,6 +122,9 @@ class TransferAgent private constructor(
                 } ?: TODO("could not connect to any exchange servers")
 
             connection = connector.connect(exchange!!) ?: error("no mx records work")
+            updateChannels()
+
+            var isEncrypted = false
 
             machine {
                 step {
@@ -125,7 +133,30 @@ class TransferAgent private constructor(
 
                 step {
                     send(EhloCommand(data.host))
-                    recvCoerced<SmtpReply.PositiveCompletion, EhloCompletion>()
+
+                    val ehlo = recv<SmtpReply.PositiveCompletion, EhloCompletion>()
+
+                    if (ehlo !is EhloCompletion) return@step StepProgression.Abort("EXPECTED EHLO REPLY. GOT: $ehlo")
+
+                    if (connection.isImplicitlyEncrypted) return@step StepProgression.Continue
+
+                    if (isEncrypted || !ehlo.capabilities.containsKey(STARTTLS)) return@step StepProgression.Continue
+
+                    send(StartTlsCommand)
+
+                    when (val resp = recv<SmtpReply.PositiveCompletion, ReadyToStartTlsCompletion>()) {
+                        is SmtpReply.PermanentNegative -> return@step StepProgression.Abort("RECEIVED NO TO STARTTLS: $resp")
+                        is SmtpReply.TransientNegative -> TODO("figure out what we should do")
+                        else -> {}
+                    }
+
+                    connection.upgradeToTls()
+                    isEncrypted = true
+                    updateChannels()
+
+                    println("SUCCESSFULLY UPGRADED TO TLS")
+
+                    StepProgression.Retry
                 }
 
                 // TODO: implement pipelining
@@ -153,7 +184,11 @@ class TransferAgent private constructor(
                     if (it is StopReason.Abrupt) println("STOPPING TRANSFER SESSION DUE TO: ${it.reason}")
 
                     send(QuitCommand)
-                    recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+
+                    try {
+                        recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+                    } catch (_: Throwable) {
+                    }
 
                     connection.close()
                 }

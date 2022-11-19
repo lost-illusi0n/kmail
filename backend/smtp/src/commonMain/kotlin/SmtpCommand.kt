@@ -167,3 +167,22 @@ public object QuitCommand : SmtpCommand {
         return "QuitCommand"
     }
 }
+
+public object StartTlsCommand : SmtpCommand {
+    // kludge: technically the format of this command is STARTTLS but during the initial implementation of kmail
+    // a 4 character discriminator was chosen as all other commands adhered to it.
+    override val discriminator: String
+        get() = "STAR"
+
+    public object Serializer {
+        public suspend fun serialize(output: AsyncSmtpWriter) {
+            output.writeStringUtf8("TTLS") // the rest of the discriminator
+            output.endLine()
+        }
+
+        public suspend fun deserialize(input: AsyncSmtpReader): StartTlsCommand {
+            input.readUtf8UntilSmtpEnding() // the rest of the discriminator
+            return StartTlsCommand
+        }
+    }
+}

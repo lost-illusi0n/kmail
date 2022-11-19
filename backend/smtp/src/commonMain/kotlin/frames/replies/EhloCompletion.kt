@@ -7,6 +7,8 @@ public typealias EhloKeyword = String
 
 public typealias EhloParam = String?
 
+public const val STARTTLS: EhloKeyword = "STARTTLS"
+
 public data class EhloCompletion(
     val domain: String,
     val greet: String?,

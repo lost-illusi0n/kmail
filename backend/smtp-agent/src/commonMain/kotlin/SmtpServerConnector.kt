@@ -1,9 +1,9 @@
 package dev.sitar.kmail.smtp.agent
 
-import dev.sitar.kmail.smtp.agent.transports.client.PlainTextSmtpTransportClient
-import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
 import dev.sitar.kmail.smtp.agent.transports.client.ImplicitTlsSmtpTransportClient
 import dev.sitar.kmail.smtp.agent.transports.client.PlainTextSmtpSubmissionTransportClient
+import dev.sitar.kmail.smtp.agent.transports.client.PlainTextSmtpTransportClient
+import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 

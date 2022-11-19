@@ -1,7 +1,6 @@
 package dev.sitar.kmail.smtp.io.smtp.writer
 
 import dev.sitar.kio.async.writers.AsyncWriter
-import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.frames.replies.*
 import dev.sitar.kmail.smtp.io.AsyncByteWriteChannelWriter
 import dev.sitar.kmail.smtp.io.writeStringUtf8
@@ -16,6 +15,11 @@ public class AsyncSmtpServerWriter(channelWriter: AsyncByteWriteChannelWriter) :
         writeStatusCode(reply.code)
 
         when (T::class) {
+            ReadyToStartTlsCompletion::class -> ReadyToStartTlsCompletion.serialize(
+                this,
+                reply as ReadyToStartTlsCompletion
+            )
+
             GreetCompletion::class -> GreetCompletion.serialize(this, reply as GreetCompletion)
             OkCompletion::class -> OkCompletion.serialize(this, reply as OkCompletion)
             EhloCompletion::class -> EhloCompletion.serialize(this, reply as EhloCompletion)

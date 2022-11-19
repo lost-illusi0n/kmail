@@ -21,6 +21,7 @@ public class AsyncSmtpClientWriter(channelWriter: AsyncByteWriteChannelWriter) :
             DataCommand::class -> DataCommand.Serializer.serialize(this)
             MailInputCommand::class -> MailInputCommand.Serializer.serialize(command as MailInputCommand, this)
             QuitCommand::class -> QuitCommand.Serializer.serialize(this)
+            StartTlsCommand::class -> StartTlsCommand.Serializer.serialize(this)
         }
 
         flush()

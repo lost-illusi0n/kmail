@@ -18,6 +18,7 @@ import kotlinx.datetime.UtcOffset
 import kotlin.system.exitProcess
 
 private const val OUR_HOST = "linux.org"
+private const val FROM = "<example@spoofed.com>"
 private const val RECIPIENT = "<example@spoofed.com>"
 
 private suspend fun main(): Unit = coroutineScope {
@@ -31,7 +32,7 @@ private suspend fun main(): Unit = coroutineScope {
     send(writer, EhloCommand(OUR_HOST))
     got<SmtpReply.PositiveCompletion>(reader)
 
-    send(writer, MailCommand("example@spoofed.com"))
+    send(writer, MailCommand(FROM))
     got<SmtpReply.PositiveCompletion>(reader)
 
     send(writer, RecipientCommand(RECIPIENT))
@@ -42,8 +43,8 @@ private suspend fun main(): Unit = coroutineScope {
 
     send(writer, MailInputCommand(message {
         headers {
-            +from("Example <example@example.com>")
-            +toRcpt("$RECIPIENT")
+            +from(FROM)
+            +toRcpt(RECIPIENT)
             +originalDate(Clock.System.now(), UtcOffset(-5))
             +subject("example")
         }

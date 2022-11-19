@@ -38,7 +38,7 @@ internal class Machine(val steps: List<Step>, val stop: Stop?) {
         while (true) {
             when (val result = step()) {
                 StepProgression.Continue -> {
-                    if (!stepsIterator.hasNext()) return
+                    if (!stepsIterator.hasNext()) break
 
                     step = stepsIterator.next()
                 }
@@ -50,6 +50,7 @@ internal class Machine(val steps: List<Step>, val stop: Stop?) {
                 is StepProgression.Abort -> {
                     stopReason = StopReason.Abrupt(result.reason)
                     break
+
                 }
             }
         }

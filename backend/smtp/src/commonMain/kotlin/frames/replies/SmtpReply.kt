@@ -1,6 +1,5 @@
 package dev.sitar.kmail.smtp.frames.replies
 
-import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpServerWriter
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpReader
 import kotlin.reflect.KClass
 
@@ -24,14 +23,22 @@ public sealed interface SmtpReply<S: Any> {
                     if (code != 250) return null
                     return EhloCompletion.from(data!!, lines) as T
                 }
+
                 OkCompletion::class -> {
                     if (code != 250) return null
                     return OkCompletion.from(data!!) as T
                 }
+
                 GreetCompletion::class -> {
                     if (code != 220) return null
                     return GreetCompletion.from(data!!) as T
                 }
+
+                ReadyToStartTlsCompletion::class -> {
+                    if (code != 220) return null
+                    return ReadyToStartTlsCompletion.from(data!!) as T
+                }
+
                 else -> error("$klass is not specialized!")
             }
         }

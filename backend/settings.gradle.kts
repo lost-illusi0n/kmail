@@ -20,3 +20,11 @@ includeBuild("../../kio") {
         substitute(module("dev.sitar:kio")).using(project(":"))
     }
 }
+
+pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "kotlinx-atomicfu") useModule("org.jetbrains.kotlinx:atomicfu-gradle-plugin:0.18.5")
+        }
+    }
+}
