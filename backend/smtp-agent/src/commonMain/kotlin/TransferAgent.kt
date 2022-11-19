@@ -6,6 +6,7 @@ import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
+import dev.sitar.kmail.smtp.frames.replies.*
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpClientWriter
@@ -14,6 +15,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.InvocationKind
+import kotlin.contracts.contract
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
@@ -58,12 +62,28 @@ class TransferAgent private constructor(
             writer.writeCommand(command)
         }
 
-        suspend inline fun <reified T: SmtpReply> recv(): T {
-            val reply = reader.readSmtpReply<T>()
+        suspend inline fun <reified C: SmtpReply<C>, reified T: C> recv(): SmtpReply<*> {
+            var reply = reader.readSmtpReply()
+
+            if (reply is C) {
+                reply = reply.tryAs<C, T>() as SmtpReply<*>
+            }
 
             kotlin.io.println("TRANSFER (${message.queueId}/$exchange) <<< $reply")
 
             return reply
+        }
+
+        suspend inline fun <reified C: SmtpReply<C>, reified T: C> recvCoerced(): StepProgression {
+            var reply = reader.readSmtpReply()
+
+            if (reply is C) {
+                (reply.tryAs<C, T>() as? SmtpReply<*>)?.let { reply = it }
+            }
+
+            kotlin.io.println("TRANSFER (${message.queueId}/$exchange) <<< $reply")
+
+            return reply.coerceToStepProgression()
         }
     }
 
@@ -98,25 +118,46 @@ class TransferAgent private constructor(
 
             connection = connector.connect(exchange!!) ?: error("no mx records work")
 
-            recv<GreetReply>()
+            machine {
+                step {
+                    recvCoerced<SmtpReply.PositiveCompletion, GreetCompletion>()
+                }
 
-            send(EhloCommand(data.host))
-            recv<EhloReply>()
+                step {
+                    send(EhloCommand(data.host))
+                    recvCoerced<SmtpReply.PositiveCompletion, EhloCompletion>()
+                }
 
-            send(MailCommand(mail.envelope.originatorAddress))
-            recv<OkReply>()
+                // TODO: implement pipelining
+                step {
+                    send(MailCommand(mail.envelope.originatorAddress))
+                    recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+                }
 
-            send(RecipientCommand(mail.envelope.recipientAddress))
-            recv<OkReply>()
+                step {
+                    send(RecipientCommand(mail.envelope.recipientAddress))
+                    recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+                }
 
-            send(DataCommand)
-            recv<StartMailInputReply>()
+                step {
+                    send(DataCommand)
+                    recvCoerced<SmtpReply.PositiveIntermediate, StartMailInputIntermediary>()
+                }
 
-            send(MailInputCommand(mail.message))
-            recv<OkReply>()
+                step {
+                    send(MailInputCommand(mail.message))
+                    recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+                }
 
-            send(QuitCommand)
-            recv<OkReply>()
+                stop {
+                    if (it is StopReason.Abrupt) println("STOPPING TRANSFER SESSION DUE TO: ${it.reason}")
+
+                    send(QuitCommand)
+                    recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+
+                    connection.close()
+                }
+            }
         }
     }
 }

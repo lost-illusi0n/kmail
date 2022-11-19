@@ -5,6 +5,7 @@ import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
 import dev.sitar.kmail.smtp.agent.transports.server.PlainTextSmtpServerTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportConnection
+import dev.sitar.kmail.smtp.frames.replies.*
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpServerReader
 import dev.sitar.kmail.smtp.io.smtp.writer.asAsyncSmtpServerWriter
 import kotlinx.coroutines.*
@@ -54,10 +55,10 @@ class SubmissionAgent private constructor(
             kotlin.io.println("SUBMISSION(${connection.remote}): $message")
         }
 
-        suspend inline fun <reified T: SmtpReply> send(status: Int, reply: T) {
+        suspend inline fun <reified T: SmtpReply<*>> send(reply: T) {
             kotlin.io.println("SUBMISSION(${connection.remote}) >>> $reply")
 
-            writer.writeReply(status, reply)
+            writer.writeReply(reply)
         }
 
         suspend inline fun <reified T: SmtpCommand> recv(): T {
@@ -75,19 +76,19 @@ class SubmissionAgent private constructor(
         val session = SubmissionSession(transport)
 
         with (session) {
-            send(220, GreetReply("Hello, I am Kmail!"))
+            send(GreetCompletion("Hello, I am Kmail!"))
 
             val ehlo = recv<EhloCommand>()
-            send(250, EhloReply(data.host, "Hello, I am Kmail!", emptyMap()))
+            send(EhloCompletion(data.host, "Hello, I am Kmail!", emptyMap()))
 
             val mail = recv<MailCommand>()
-            send(221, OkReply("Ok."))
+            send(OkCompletion("Ok."))
 
             val rcpt = recv<RecipientCommand>()
-            send(221, OkReply("Ok."))
+            send(OkCompletion("Ok."))
 
             recv<DataCommand>()
-            send(354, StartMailInputReply)
+            send(StartMailInputIntermediary("spill the tea."))
 
             val mailInput = recv<MailInputCommand>()
             val internetMessage = InternetMessage(Envelope(mail.from, rcpt.to), mailInput.message)
@@ -95,11 +96,11 @@ class SubmissionAgent private constructor(
 
             println("QUEUED MESSAGE ${internetMessage.queueId}")
 
-            send(221, OkReply("Queued as ${internetMessage.queueId}"))
+            send(OkCompletion("Queued as ${internetMessage.queueId}"))
 
             // TODO: this should be a state machine and the client should be able to make a new mail or quit.
             recv<QuitCommand>()
-            send(221, OkReply("Goodbye."))
+            send(OkCompletion("Goodbye."))
 
             connection.close()
         }

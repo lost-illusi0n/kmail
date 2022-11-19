@@ -6,6 +6,7 @@ import dev.sitar.kmail.message.headers.subject
 import dev.sitar.kmail.message.headers.toRcpt
 import dev.sitar.kmail.message.message
 import dev.sitar.kmail.smtp.*
+import dev.sitar.kmail.smtp.frames.replies.SmtpReply
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpClientReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpClientWriter
@@ -17,7 +18,7 @@ import kotlinx.datetime.UtcOffset
 import kotlin.system.exitProcess
 
 private const val OUR_HOST = "linux.org"
-private const val RECIPIENT = "<example@exampl.com>"
+private const val RECIPIENT = "<example@spoofed.com>"
 
 private suspend fun main(): Unit = coroutineScope {
     val transport = DefaultSubmissionSmtpConnector().connect("0.0.0.0") ?: error("could not connect")
@@ -25,19 +26,19 @@ private suspend fun main(): Unit = coroutineScope {
     val reader = transport.reader.asAsyncSmtpClientReader()
     val writer = transport.writer.asAsyncSmtpClientWriter()
 
-    got<GreetReply>(reader)
+    got<SmtpReply.PositiveCompletion>(reader)
 
     send(writer, EhloCommand(OUR_HOST))
-    got<EhloReply>(reader)
+    got<SmtpReply.PositiveCompletion>(reader)
 
-    send(writer, MailCommand("Example <example@example.gay>"))
-    got<OkReply>(reader)
+    send(writer, MailCommand("example@spoofed.com"))
+    got<SmtpReply.PositiveCompletion>(reader)
 
     send(writer, RecipientCommand(RECIPIENT))
-    got<OkReply>(reader)
+    got<SmtpReply.PositiveCompletion>(reader)
 
     send(writer, DataCommand)
-    got<StartMailInputReply>(reader)
+    got<SmtpReply.PositiveIntermediate>(reader)
 
     send(writer, MailInputCommand(message {
         headers {
@@ -51,17 +52,18 @@ private suspend fun main(): Unit = coroutineScope {
             line("example")
         }
     }))
-    got<OkReply>(reader)
+    got<SmtpReply.PositiveCompletion>(reader)
 
     send(writer, QuitCommand)
-    got<OkReply>(reader)
+    got<SmtpReply.PositiveCompletion>(reader)
 
     exitProcess(0)
 }
 
 // TODO: temporary writer/reader functions, replace with client (in agent module maybe)
-private suspend inline fun <reified T: SmtpReply> got(reader: AsyncSmtpClientReader) {
-    val reply = reader.readSmtpReply<T>()
+private suspend inline fun <reified C: SmtpReply<C>> got(reader: AsyncSmtpClientReader) {
+    val reply = reader.readSmtpReply()
+    require(reply is C)
     println("SUBMISSION CLIENT <<< $reply")
 }
 
