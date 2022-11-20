@@ -13,16 +13,30 @@ public class AsyncSmtpClientReader(reader: AsyncReader) : AsyncSmtpReader, Async
     }
 
     // TODO: instead of always expecting T (a good result), take a map (status code -> expected reply)
-    public suspend inline fun readSmtpReply(): SmtpReply<*> {
-        val code = readSmtpCode()
+    public suspend fun readSmtpReply(): SmtpReply<*> {
+        val body = deserializeBody()
+        val code = body.first().first
+        val lines = body.map { it.second }
 
         // we check the first digit of the code and deserialize as a category.
         return when (code / 100) {
-            SmtpReply.PositiveCompletion.DIGIT -> SmtpReply.PositiveCompletion.deserialize(code, this)
-            SmtpReply.PositiveIntermediate.DIGIT -> SmtpReply.PositiveIntermediate.deserialize(code, this)
-            SmtpReply.PermanentNegative.DIGIT -> SmtpReply.PermanentNegative.deserialize(code, this)
-            SmtpReply.TransientNegative.DIGIT -> SmtpReply.TransientNegative.deserialize(code, this)
+            SmtpReply.PositiveCompletion.DIGIT -> SmtpReply.PositiveCompletion.Default(code, lines)
+            SmtpReply.PositiveIntermediate.DIGIT -> SmtpReply.PositiveIntermediate.Default(code, lines)
+            SmtpReply.PermanentNegative.DIGIT -> SmtpReply.PermanentNegative.Default(code, lines)
+            SmtpReply.TransientNegative.DIGIT -> SmtpReply.TransientNegative.Default(code, lines)
             else -> error("unknown code: $code")
+        }
+    }
+
+    private suspend fun deserializeBody(): List<Pair<Int, String>> {
+        var isFinal: Boolean
+
+        return buildList {
+            do {
+                val code = readSmtpCode()
+                isFinal = readIsFinal()
+                add(code to readUtf8UntilSmtpEnding())
+            } while (!isFinal)
         }
     }
 }

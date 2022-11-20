@@ -5,8 +5,6 @@ import io.ktor.network.sockets.*
 import kotlinx.coroutines.Dispatchers
 
 object PlainTextSmtpSubmissionTransportClient : SmtpSocketTransportClient {
-    const val SMTP_SUBMISSION_PORT = 587
-
     override suspend fun fromConnectedSocket(socket: Socket): SmtpTransportConnection {
         return SmtpSocketTransportConnection(socket)
     }

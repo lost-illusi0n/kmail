@@ -1,7 +1,7 @@
 package dev.sitar.kmail.smtp.agent.transports.client
 
-import dev.sitar.kmail.smtp.io.AsyncByteReadChannelReader
-import dev.sitar.kmail.smtp.io.AsyncByteWriteChannelWriter
+import dev.sitar.kio.async.readers.AsyncReader
+import dev.sitar.kmail.smtp.io.AsyncWriterStream
 
 interface SmtpTransportConnection {
     val remote: String
@@ -11,8 +11,8 @@ interface SmtpTransportConnection {
 
     suspend fun upgradeToTls()
 
-    val reader: AsyncByteReadChannelReader
-    val writer: AsyncByteWriteChannelWriter
+    val reader: AsyncReader
+    val writer: AsyncWriterStream
 
     fun close()
 }

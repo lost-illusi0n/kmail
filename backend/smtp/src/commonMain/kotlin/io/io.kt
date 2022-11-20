@@ -5,9 +5,15 @@ import dev.sitar.kio.async.readers.readFully
 import dev.sitar.kio.async.writers.AsyncWriter
 import dev.sitar.kio.async.writers.writeBytes
 import dev.sitar.kio.buffers.Buffer
+import dev.sitar.kio.buffers.SequentialWriter
 import dev.sitar.kio.buffers.buffer
+import dev.sitar.kio.buffers.writeBytes
 
 internal suspend fun AsyncWriter.writeStringUtf8(string: String) {
+    writeBytes(string.toByteArray())
+}
+
+internal fun SequentialWriter.writeStringUtf8(string: String) {
     writeBytes(string.toByteArray())
 }
 

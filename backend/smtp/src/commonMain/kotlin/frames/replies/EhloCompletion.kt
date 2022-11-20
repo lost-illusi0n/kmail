@@ -16,21 +16,34 @@ public data class EhloCompletion(
 ) :
     SmtpReply.PositiveCompletion by SmtpReply.PositiveCompletion.Default(
         code = 250,
-        data = "$domain${greet?.let { " $it" }}",
-        lines = capabilities.map { (key, param) -> "$key${param?.let { " $it" }}" }
+        lines = listOf("$domain${greet?.let { " $it" }}") + capabilities.map { (key, param) -> "$key${param?.let { " $it" }}" }
     ) {
     public companion object {
-        public fun from(data: String, lines: List<String>): EhloCompletion {
-            val (domain, greet) = when (val index = data.indexOf(' ')) {
-                -1 -> Pair(data, null)
-                else -> Pair(data.substring(0..index), data.substring(index))
-            }
+        public fun from(lines: List<String>): EhloCompletion {
+            lateinit var domain: String
+            var greet: String? = null
+            var capabilities: Map<EhloKeyword, EhloParam> = emptyMap()
 
+            for ((index, line) in lines.withIndex()) {
+                when (index) {
+                    0 -> {
+                        when (val index = line.indexOf(' ')) {
+                            -1 -> domain = line
+                            else -> {
+                                domain = line.substring(0..index)
+                                greet = line.substring(index)
+                            }
+                        }
+                    }
 
-            val capabilities = lines.associate {
-                when (val index = it.indexOf(' ')) {
-                    -1 -> Pair(it, null)
-                    else -> Pair(it.substring(0..index), it.substring(index))
+                    else -> {
+                        capabilities = lines.asSequence().drop(1).associate {
+                            when (val index = it.indexOf(' ')) {
+                                -1 -> it to null
+                                else -> it.substring(0..index) to it.substring(index)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -38,7 +51,7 @@ public data class EhloCompletion(
         }
 
         public suspend fun serialize(output: AsyncSmtpServerWriter, ehlo: EhloCompletion) {
-            output.writeIsFinal(ehlo.lines.isEmpty())
+            output.writeIsFinal(ehlo.capabilities.isEmpty())
 
             output.writeStringUtf8(ehlo.domain)
 
@@ -47,7 +60,8 @@ public data class EhloCompletion(
             output.endLine()
 
             ehlo.capabilities.onEachIndexed { i, (keyword, param) ->
-                output.writeIsFinal(i == ehlo.lines.size)
+                output.writeStatusCode(ehlo.code)
+                output.writeIsFinal(i == ehlo.capabilities.size - 1)
 
                 output.writeStringUtf8(keyword)
 

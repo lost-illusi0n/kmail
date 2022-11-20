@@ -30,7 +30,11 @@ class TransferAgent private constructor(
     companion object {
         private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
 
-        suspend fun fromOutgoingMessages(hostname: String, outgoingMessages: Flow<InternetMessage>, connector: SmtpServerConnector = DefaultTransferSmtpConnector()): TransferAgent {
+        suspend fun fromOutgoingMessages(
+            hostname: String,
+            outgoingMessages: Flow<InternetMessage>,
+            connector: SmtpServerConnector = DefaultTransferSessionSmtpConnector()
+        ): TransferAgent {
             return TransferAgent(SmtpServerData(hostname), connector, outgoingMessages, coroutineContext)
         }
     }

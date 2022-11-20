@@ -7,13 +7,11 @@ import kotlin.reflect.KClass
 // TODO: clean up categories
 public sealed interface SmtpReply<S: Any> {
     public val code: Int
-    public val data: String?
     public val lines: List<String>
 
     public sealed interface PositiveCompletion : SmtpReply<PositiveCompletion> {
         public data class Default(
             override val code: Int,
-            override val data: String?,
             override val lines: List<String> = emptyList(),
         ) : PositiveCompletion
 
@@ -21,22 +19,22 @@ public sealed interface SmtpReply<S: Any> {
             return when (klass) {
                 EhloCompletion::class -> {
                     if (code != 250) return null
-                    return EhloCompletion.from(data!!, lines) as T
+                    return EhloCompletion.from(lines) as T
                 }
 
                 OkCompletion::class -> {
                     if (code != 250) return null
-                    return OkCompletion.from(data!!) as T
+                    return OkCompletion.from(lines) as T
                 }
 
                 GreetCompletion::class -> {
                     if (code != 220) return null
-                    return GreetCompletion.from(data!!) as T
+                    return GreetCompletion.from(lines) as T
                 }
 
                 ReadyToStartTlsCompletion::class -> {
                     if (code != 220) return null
-                    return ReadyToStartTlsCompletion.from(data!!) as T
+                    return ReadyToStartTlsCompletion.from(lines) as T
                 }
 
                 else -> error("$klass is not specialized!")
@@ -45,29 +43,12 @@ public sealed interface SmtpReply<S: Any> {
 
         public companion object {
             public const val DIGIT: Int = 2
-
-            public suspend fun deserialize(code: Int, input: AsyncSmtpReader): Default {
-                val lines = mutableListOf<String>()
-
-                var isFinal = input.readIsFinal()
-
-                val data = input.readUtf8UntilSmtpEnding()
-
-                while (!isFinal) {
-                    input.discard(3) // the code. we dont care
-                    isFinal = input.readIsFinal()
-                    lines += input.readUtf8UntilSmtpEnding()
-                }
-
-                return Default(code, data, lines)
-            }
         }
     }
 
     public sealed interface PositiveIntermediate : SmtpReply<PositiveIntermediate> {
         public data class Default(
             override val code: Int,
-            override val data: String?,
             override val lines: List<String> = emptyList(),
         ) : PositiveIntermediate
 
@@ -75,7 +56,7 @@ public sealed interface SmtpReply<S: Any> {
             return when (klass) {
                 StartMailInputIntermediary::class -> {
                     if (code != 354) return null
-                    return StartMailInputIntermediary.from(data!!) as T
+                    return StartMailInputIntermediary.from(lines) as T
                 }
                 else -> error("$klass is not specialized!")
             }
@@ -83,27 +64,11 @@ public sealed interface SmtpReply<S: Any> {
 
         public companion object {
             public const val DIGIT: Int = 3
-
-            public suspend fun deserialize(code: Int, input: AsyncSmtpReader): Default {
-                val lines = mutableListOf<String>()
-
-                var isFinal = input.readIsFinal()
-
-                val data = input.readUtf8UntilSmtpEnding()
-
-                while (!isFinal) {
-                    isFinal = input.readIsFinal()
-                    lines += input.readUtf8UntilSmtpEnding()
-                }
-
-                return Default(code, data, lines)
-            }
         }
     }
     public sealed interface TransientNegative : SmtpReply<TransientNegative> {
         public data class Default(
             override val code: Int,
-            override val data: String?,
             override val lines: List<String> = emptyList(),
         ) : TransientNegative
 
@@ -113,27 +78,11 @@ public sealed interface SmtpReply<S: Any> {
 
         public companion object {
             public const val DIGIT: Int = 4
-
-            public suspend fun deserialize(code: Int, input: AsyncSmtpReader): Default {
-                val lines = mutableListOf<String>()
-
-                var isFinal = input.readIsFinal()
-
-                val data = input.readUtf8UntilSmtpEnding()
-
-                while (!isFinal) {
-                    isFinal = input.readIsFinal()
-                    lines += input.readUtf8UntilSmtpEnding()
-                }
-
-                return Default(code, data, lines)
-            }
         }
     }
     public sealed interface PermanentNegative : SmtpReply<PermanentNegative> {
         public data class Default(
             override val code: Int,
-            override val data: String?,
             override val lines: List<String> = emptyList(),
         ) : PermanentNegative
 
@@ -143,21 +92,6 @@ public sealed interface SmtpReply<S: Any> {
 
         public companion object {
             public val DIGIT: Int = 5
-
-            public suspend fun deserialize(code: Int, input: AsyncSmtpReader): Default {
-                val lines = mutableListOf<String>()
-
-                var isFinal = input.readIsFinal()
-
-                val data = input.readUtf8UntilSmtpEnding()
-
-                while (!isFinal) {
-                    isFinal = input.readIsFinal()
-                    lines += input.readUtf8UntilSmtpEnding()
-                }
-
-                return Default(code, data, lines)
-            }
         }
     }
 

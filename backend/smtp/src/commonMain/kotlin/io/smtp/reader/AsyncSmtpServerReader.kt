@@ -21,6 +21,7 @@ public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, Async
             "DATA" -> DataCommand.Serializer.deserialize(this) as T
             "QUIT" -> QuitCommand.Serializer.deserialize(this) as T
             "STAR" -> StartTlsCommand.Serializer.deserialize(this) as T
+            "AUTH" -> AuthenticationCommand.Serializer.deserialize(this) as T
             else -> error("unknown command: $command")
         }
     }

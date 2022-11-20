@@ -1,9 +1,6 @@
 package dev.sitar.kmail.smtp.agent
 
-import dev.sitar.kmail.smtp.agent.transports.client.ImplicitTlsSmtpTransportClient
-import dev.sitar.kmail.smtp.agent.transports.client.PlainTextSmtpSubmissionTransportClient
-import dev.sitar.kmail.smtp.agent.transports.client.PlainTextSmtpTransportClient
-import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
+import dev.sitar.kmail.smtp.agent.transports.client.*
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -11,15 +8,17 @@ interface SmtpServerConnector {
     suspend fun connect(server: String): SmtpTransportConnection?
 }
 
-class DefaultTransferSmtpConnector(val timeout: Long = 500) : SmtpServerConnector {
+class DefaultTransferSessionSmtpConnector(val timeout: Long = 500, vararg val additionalClients: SmtpTransportClient) :
+    SmtpServerConnector {
     companion object {
         val STANDARD_SERVICES = listOf(
-            PlainTextSmtpTransportClient
+            ImplicitTlsSmtpTransportClient,
+            PlainTextSmtpTransferTransportClient
         )
     }
 
     override suspend fun connect(server: String): SmtpTransportConnection? {
-        for (service in STANDARD_SERVICES) {
+        for (service in additionalClients.toList() + STANDARD_SERVICES) {
             val connection = withTimeoutOrNull(timeout) {
                 println("SMTP SERVER CONNECTOR: ATTEMPTING CONNECTION TO $server USING $service")
                 service.connect(server)
@@ -32,7 +31,10 @@ class DefaultTransferSmtpConnector(val timeout: Long = 500) : SmtpServerConnecto
     }
 }
 
-class DefaultSubmissionSmtpConnector(val timeout: Long = 500) : SmtpServerConnector {
+class DefaultSubmissionSessionSmtpConnector(
+    val timeout: Long = 500,
+    vararg val additionalClients: SmtpTransportClient
+) : SmtpServerConnector {
     companion object {
         val STANDARD_SERVICES = listOf(
             ImplicitTlsSmtpTransportClient,
@@ -41,7 +43,7 @@ class DefaultSubmissionSmtpConnector(val timeout: Long = 500) : SmtpServerConnec
     }
 
     override suspend fun connect(server: String): SmtpTransportConnection? {
-        for (service in STANDARD_SERVICES) {
+        for (service in additionalClients.toList() + STANDARD_SERVICES) {
             try {
                 return withTimeout(timeout) {
                     println("SMTP SERVER CONNECTOR: ATTEMPTING CONNECTION TO $server USING $service")

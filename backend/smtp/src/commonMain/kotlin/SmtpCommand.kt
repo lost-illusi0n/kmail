@@ -185,4 +185,41 @@ public object StartTlsCommand : SmtpCommand {
             return StartTlsCommand
         }
     }
+
+    override fun toString(): String {
+        return "StartTlsCommand"
+    }
+}
+
+public data class AuthenticationCommand(val mechanism: String, val response: SaslMechanism?): SmtpCommand {
+    override val discriminator: String = "AUTH"
+
+    public object Serializer {
+        public suspend fun serialize(authentication: AuthenticationCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
+            output.writeStringUtf8(authentication.mechanism)
+            authentication.response?.let { output.writeStringUtf8(" ${authentication.response.encode()}") }
+            output.endLine()
+        }
+
+        public suspend fun deserialize(input: AsyncSmtpReader): AuthenticationCommand {
+            input.readIsFinal()
+            val line = input.readUtf8UntilSmtpEnding()
+
+            return when (val index = line.indexOf(' ')) {
+                -1 -> AuthenticationCommand(line, null)
+                else -> {
+                    val mechanism = line.substring(0, index)
+                    val encoded = line.substring(index + 1)
+
+                    val decoded = when (mechanism) {
+                        "PLAIN" -> decodePlainSaslMechanism(encoded)
+                        else -> error("unsupported sasl mechanism: $mechanism")
+                    }
+
+                    AuthenticationCommand(line.substring(0, index), decoded)
+                }
+            }
+        }
+    }
 }

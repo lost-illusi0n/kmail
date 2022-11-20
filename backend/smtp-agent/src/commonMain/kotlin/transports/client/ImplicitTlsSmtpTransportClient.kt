@@ -7,14 +7,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlin.coroutines.coroutineContext
 
 object ImplicitTlsSmtpTransportClient : SmtpSocketTransportClient {
-    const val IMPLICIT_SMTPS_PORT = 465
-
     override suspend fun fromConnectedSocket(socket: Socket): SmtpTransportConnection {
         return SmtpSocketTransportConnection(socket.tls(coroutineContext), isImplicitlyEncrypted = true)
     }
 
     override suspend fun connect(server: String): SmtpTransportConnection {
-        val socket = aSocket(SelectorManager(Dispatchers.Default)).tcp().connect(server, IMPLICIT_SMTPS_PORT)
+        val socket = aSocket(SelectorManager(Dispatchers.Default)).tcp().connect(server, IMPLICIT_SMTP_PORT)
 
         return fromConnectedSocket(socket)
     }

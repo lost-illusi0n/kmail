@@ -5,10 +5,10 @@ import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpServerWriter
 import dev.sitar.kmail.smtp.io.writeStringUtf8
 
 public data class GreetCompletion(val greet: String) :
-    SmtpReply.PositiveCompletion by SmtpReply.PositiveCompletion.Default(code = 220, data = "$greet") {
+    SmtpReply.PositiveCompletion by SmtpReply.PositiveCompletion.Default(code = 220, lines = listOf(greet)) {
     public companion object {
-        public fun from(data: String): GreetCompletion {
-            return GreetCompletion(data)
+        public fun from(lines: List<String>): GreetCompletion {
+            return GreetCompletion(lines.first())
         }
 
         public suspend fun serialize(output: AsyncSmtpServerWriter, greet: GreetCompletion) {

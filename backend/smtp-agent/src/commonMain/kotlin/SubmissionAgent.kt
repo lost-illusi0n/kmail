@@ -2,7 +2,6 @@ package dev.sitar.kmail.smtp.agent
 
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
-import dev.sitar.kmail.smtp.agent.transports.server.PlainTextSmtpServerTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportConnection
 import dev.sitar.kmail.smtp.frames.replies.*
@@ -15,20 +14,24 @@ import kotlinx.coroutines.flow.consumeAsFlow
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
-// TODO: authentication
 // TODO: transport encryption
 class SubmissionAgent private constructor(
     val data: SmtpServerData,
     val server: SmtpServerTransportConnection,
+    val authenticationManager: SubmissionAuthenticationManager<out SmtpAuthenticatedUser>?,
     coroutineContext: CoroutineContext
 ) {
     companion object {
         // TODO: we should take some extra information to better process incoming messages as a msu
-        suspend fun withHostname(host: String, client: SmtpServerTransportClient = PlainTextSmtpServerTransportClient): SubmissionAgent {
+        suspend fun withHostname(
+            host: String,
+            authenticationManager: SubmissionAuthenticationManager<*>? = null,
+            client: SmtpServerTransportClient
+        ): SubmissionAgent {
             val connection = client.bind()
             println("SUBMISSION: STARTED LISTENING")
 
-            return SubmissionAgent(SmtpServerData(host), connection, coroutineContext)
+            return SubmissionAgent(SmtpServerData(host), connection, authenticationManager, coroutineContext)
         }
     }
 
@@ -48,14 +51,14 @@ class SubmissionAgent private constructor(
     private data class SubmissionSession(
         val connection: SmtpTransportConnection
     ) {
-        val reader = connection.reader.asAsyncSmtpServerReader()
-        val writer = connection.writer.asAsyncSmtpServerWriter()
+        var reader = connection.reader.asAsyncSmtpServerReader()
+        var writer = connection.writer.asAsyncSmtpServerWriter()
 
         fun println(message: String) {
             kotlin.io.println("SUBMISSION(${connection.remote}): $message")
         }
 
-        suspend inline fun <reified T: SmtpReply<*>> send(reply: T) {
+        suspend inline fun <reified T : SmtpReply<*>> send(reply: T) {
             kotlin.io.println("SUBMISSION(${connection.remote}) >>> $reply")
 
             writer.writeReply(reply)
@@ -64,12 +67,13 @@ class SubmissionAgent private constructor(
         suspend inline fun <reified T: SmtpCommand> recv(): T {
             val resp = reader.readSmtpCommand<T>()
 
-            kotlin.io.println("SUBMISSION(${connection.remote}) >>> $resp")
+            kotlin.io.println("SUBMISSION(${connection.remote}) <<< $resp")
 
             return resp
         }
     }
 
+    // TODO!!: this should be a state machine
     private suspend fun listen(transport: SmtpTransportConnection) {
         println("ACCEPTED A CONNECTION FROM ${transport.remote}")
 
@@ -78,11 +82,35 @@ class SubmissionAgent private constructor(
         with (session) {
             send(GreetCompletion("Hello, I am Kmail!"))
 
+            recv<EhloCommand>()
+            send(EhloCompletion(data.host, "Hello, I am Kmail!", mapOf("STARTTLS" to null)))
+
+            recv<StartTlsCommand>()
+            send(ReadyToStartTlsCompletion("Go ahead."))
+            transport.upgradeToTls()
+            reader = transport.reader.asAsyncSmtpServerReader()
+            writer = transport.writer.asAsyncSmtpServerWriter()
+            println("UPGRADED")
+
             val ehlo = recv<EhloCommand>()
-            send(EhloCompletion(data.host, "Hello, I am Kmail!", emptyMap()))
+            send(EhloCompletion(data.host, "Hello, I am Kmail!", mapOf("AUTH" to "PLAIN")))
+
+            val auth = recv<AuthenticationCommand>()
+            requireNotNull(authenticationManager)
+
+            val user = authenticationManager.authenticate(auth.response!!)
+            requireNotNull(user)
+            send(OkCompletion("Authenticated."))
 
             val mail = recv<MailCommand>()
             send(OkCompletion("Ok."))
+
+            require(
+                (authenticationManager as SubmissionAuthenticationManager<in SmtpAuthenticatedUser>).canSend(
+                    user,
+                    mail.from
+                )
+            )
 
             val rcpt = recv<RecipientCommand>()
             send(OkCompletion("Ok."))
@@ -98,7 +126,6 @@ class SubmissionAgent private constructor(
 
             send(OkCompletion("Queued as ${internetMessage.queueId}"))
 
-            // TODO: this should be a state machine and the client should be able to make a new mail or quit.
             recv<QuitCommand>()
             send(OkCompletion("Goodbye."))
 

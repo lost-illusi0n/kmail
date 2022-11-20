@@ -1,9 +1,9 @@
 package dev.sitar.kmail.smtp.agent.transports.client
 
-import dev.sitar.kmail.smtp.io.AsyncByteReadChannelReader
-import dev.sitar.kmail.smtp.io.AsyncByteWriteChannelWriter
-import dev.sitar.kmail.smtp.io.toAsyncByteChannelWriter
-import dev.sitar.kmail.smtp.io.toAsyncByteReadChannelReader
+import dev.sitar.kio.async.readers.AsyncReader
+import dev.sitar.kmail.smtp.io.AsyncWriterStream
+import dev.sitar.kmail.smtp.io.toAsyncReader
+import dev.sitar.kmail.smtp.io.toAsyncWriterStream
 import io.ktor.network.sockets.*
 import io.ktor.network.tls.*
 import io.ktor.utils.io.*
@@ -14,16 +14,25 @@ class SmtpSocketTransportConnection(private var socket: Socket, override val isI
     override val remote: String = socket.remoteAddress.toString()
 
     private var _readChannel: ByteReadChannel = socket.openReadChannel()
+        set(value) {
+            field = value
+            _reader = field.toAsyncReader()
+        }
     private var _writeChannel: ByteWriteChannel = socket.openWriteChannel()
-    private var _reader: AsyncByteReadChannelReader = _readChannel.toAsyncByteReadChannelReader()
-    private var _writer: AsyncByteWriteChannelWriter = _writeChannel.toAsyncByteChannelWriter()
+        set(value) {
+            field = value
+            _writer = field.toAsyncWriterStream()
+        }
+
+    private var _reader = _readChannel.toAsyncReader()
+    private var _writer = _writeChannel.toAsyncWriterStream()
 
     private var isUpgraded: Boolean = false
 
-    override val reader: AsyncByteReadChannelReader
+    override val reader: AsyncReader
         get() = _reader
 
-    override val writer: AsyncByteWriteChannelWriter
+    override val writer: AsyncWriterStream
         get() = _writer
 
     override suspend fun upgradeToTls() {
@@ -33,8 +42,6 @@ class SmtpSocketTransportConnection(private var socket: Socket, override val isI
 
         _readChannel = socket.openReadChannel()
         _writeChannel = socket.openWriteChannel()
-        _reader = _readChannel.toAsyncByteReadChannelReader()
-        _writer = _writeChannel.toAsyncByteChannelWriter()
 
         isUpgraded = true
     }
