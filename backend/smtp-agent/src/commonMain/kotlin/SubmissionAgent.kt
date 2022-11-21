@@ -1,5 +1,6 @@
 package dev.sitar.kmail.smtp.agent
 
+import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
@@ -15,19 +16,19 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
 // TODO: transport encryption
-class SubmissionAgent private constructor(
+class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
     val data: SmtpServerData,
     val server: SmtpServerTransportConnection,
-    val authenticationManager: SubmissionAuthenticationManager<out SmtpAuthenticatedUser>?,
+    val authenticationManager: SubmissionAuthenticationManager<User>,
     coroutineContext: CoroutineContext
 ) {
     companion object {
         // TODO: we should take some extra information to better process incoming messages as a msu
-        suspend fun withHostname(
+        suspend fun <User : SmtpAuthenticatedUser> withHostname(
             host: String,
-            authenticationManager: SubmissionAuthenticationManager<*>? = null,
+            authenticationManager: SubmissionAuthenticationManager<User>,
             client: SmtpServerTransportClient
-        ): SubmissionAgent {
+        ): SubmissionAgent<User> {
             val connection = client.bind()
             println("SUBMISSION: STARTED LISTENING")
 
@@ -64,13 +65,51 @@ class SubmissionAgent private constructor(
             writer.writeReply(reply)
         }
 
-        suspend inline fun <reified T: SmtpCommand> recv(): T {
-            val resp = reader.readSmtpCommand<T>()
+        suspend inline fun recv(): SmtpCommand {
+            val resp = reader.readSmtpCommand()
 
             kotlin.io.println("SUBMISSION(${connection.remote}) <<< $resp")
 
             return resp
         }
+
+        suspend inline fun recvChecked(): SmtpCommand? {
+            return when (val resp = recv()) {
+                is QuitCommand -> {
+                    send(OkCompletion("Goodbye."))
+                    connection.close()
+                    null
+                }
+                else -> resp
+            }
+        }
+
+        suspend inline fun <reified T : SmtpCommand> recvExpected(): T? {
+            return when (val resp = recvChecked()) {
+                null -> null
+                is T -> resp
+                else -> TODO("handle unexpected command")
+            }
+        }
+    }
+
+    sealed interface State {
+        object Established : State
+
+        object Initiate : State
+
+        object Initiated : State
+
+        object Authorized : State
+
+        data class Recipient(
+            val from: String,
+            val recipients: List<String>
+        ) : State {
+            fun progress(message: Message) = GotMail(from, recipients, message)
+        }
+
+        data class GotMail(val from: String, val recipients: List<String>, val message: Message) : State
     }
 
     // TODO!!: this should be a state machine
@@ -79,57 +118,118 @@ class SubmissionAgent private constructor(
 
         val session = SubmissionSession(transport)
 
-        with (session) {
-            send(GreetCompletion("Hello, I am Kmail!"))
+        var state: State = State.Established
 
-            recv<EhloCommand>()
-            send(EhloCompletion(data.host, "Hello, I am Kmail!", mapOf("STARTTLS" to null)))
+        // TODO: make isUpgraded part of the transport?
+        var isUpgraded = false
 
-            recv<StartTlsCommand>()
-            send(ReadyToStartTlsCompletion("Go ahead."))
-            transport.upgradeToTls()
-            reader = transport.reader.asAsyncSmtpServerReader()
-            writer = transport.writer.asAsyncSmtpServerWriter()
-            println("UPGRADED")
+        var isAuthenticated = false
+        var authenticatedUser: User? = null
 
-            val ehlo = recv<EhloCommand>()
-            send(EhloCompletion(data.host, "Hello, I am Kmail!", mapOf("AUTH" to "PLAIN")))
+        with(session) {
+            while (true) {
+                when (state) {
+                    State.Established -> {
+                        send(GreetCompletion("Hello, I am Kmail!"))
+                        state = State.Initiate
+                    }
 
-            val auth = recv<AuthenticationCommand>()
-            requireNotNull(authenticationManager)
+                    State.Initiate -> {
+                        recvExpected<EhloCommand>() ?: break
 
-            val user = authenticationManager.authenticate(auth.response!!)
-            requireNotNull(user)
-            send(OkCompletion("Authenticated."))
+                        val capabilities: Map<EhloKeyword, EhloParam> = buildMap {
+                            if (!isUpgraded) put("STARTTLS", null)
+                            else if (!isAuthenticated) put("AUTH", "PLAIN")
+                        }
 
-            val mail = recv<MailCommand>()
-            send(OkCompletion("Ok."))
+                        send(EhloCompletion(data.host, "Hello, I am Kmail!", capabilities))
+                        state = State.Initiated
+                    }
 
-            require(
-                (authenticationManager as SubmissionAuthenticationManager<in SmtpAuthenticatedUser>).canSend(
-                    user,
-                    mail.from
-                )
-            )
+                    State.Initiated -> {
+                        // if an auth manager is present, require auth.
+                        if (authenticationManager != null) {
+                            if (transport.isImplicitlyEncrypted || isUpgraded) {
+                                val auth = recvExpected<AuthenticationCommand>() ?: break
 
-            val rcpt = recv<RecipientCommand>()
-            send(OkCompletion("Ok."))
+                                if (auth.response == null) TODO("handle null initial response")
 
-            recv<DataCommand>()
-            send(StartMailInputIntermediary("spill the tea."))
+                                authenticatedUser = authenticationManager.authenticate(auth.response!!)
+                                    ?: TODO("could not authenticate user")
 
-            val mailInput = recv<MailInputCommand>()
-            val internetMessage = InternetMessage(Envelope(mail.from, rcpt.to), mailInput.message)
-            _incomingMail.send(internetMessage)
+                                isAuthenticated = true
 
-            println("QUEUED MESSAGE ${internetMessage.queueId}")
+                                send(OkCompletion("Authorized."))
 
-            send(OkCompletion("Queued as ${internetMessage.queueId}"))
+                                state = State.Authorized
+                                continue
+                            }
 
-            recv<QuitCommand>()
-            send(OkCompletion("Goodbye."))
+                            // to require auth we first require tls
 
-            connection.close()
+                            recvExpected<StartTlsCommand>() ?: break
+                            send(ReadyToStartTlsCompletion("Go ahead."))
+
+                            transport.upgradeToTls()
+
+                            isUpgraded = true
+
+                            reader = transport.reader.asAsyncSmtpServerReader()
+                            writer = transport.writer.asAsyncSmtpServerWriter()
+
+                            state = State.Initiate
+                            continue
+                        }
+
+                        // there is no authentication required
+                        isAuthenticated = true
+                        state = State.Authorized
+                    }
+
+                    State.Authorized -> {
+                        val mail = recvExpected<MailCommand>() ?: break
+
+                        val canSend = authenticatedUser?.let { authenticationManager?.canSend(it, mail.from) } ?: true
+
+                        if (!canSend) TODO("authenticated user is not authorized to send as ${mail.from}")
+
+                        send(OkCompletion("Ok."))
+
+                        state = State.Recipient(mail.from, emptyList())
+                    }
+
+                    is State.Recipient -> {
+                        state = when (val resp = recvChecked() ?: break) {
+                            is RecipientCommand -> {
+                                send(OkCompletion("Ok."))
+
+                                (state as State.Recipient).let {
+                                    it.copy(recipients = it.recipients + resp.to)
+                                }
+                            }
+
+                            is DataCommand -> {
+                                send(StartMailInputIntermediary("End message with <CR><LF>.<CR><LF>"))
+
+                                val message = reader.readMailInput()
+
+                                (state as State.Recipient).progress(message)
+                            }
+
+                            else -> TODO("unexpected command")
+                        }
+                    }
+
+                    is State.GotMail -> (state as State.GotMail).let {
+                        val message = InternetMessage(Envelope(it.from, it.recipients), it.message)
+                        send(OkCompletion("Queued as ${message.queueId}"))
+
+                        _incomingMail.send(message)
+
+                        state = State.Authorized
+                    }
+                }
+            }
         }
     }
 }

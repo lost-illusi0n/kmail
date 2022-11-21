@@ -1,29 +1,56 @@
 package dev.sitar.kmail.smtp.io.smtp.reader
 
 import dev.sitar.kio.async.readers.AsyncReader
+import dev.sitar.kio.buffers.DefaultBufferPool
+import dev.sitar.kio.fullSlice
+import dev.sitar.kio.use
+import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
-import dev.sitar.kmail.smtp.io.readStringUtf8
+import dev.sitar.kmail.smtp.io.readUtf8StringUntil
+import kotlin.math.max
 
 public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, AsyncReader by reader {
-    public suspend fun readSmtpCommandKey(): String {
-        return readStringUtf8(4)
+    private companion object {
+        private val MESSAGE_TERMINATING_SEQUENCE = "\r\n.\r\n".toByteArray().fullSlice()
+    }
+
+    private suspend fun readSmtpCommandTag(): Pair<String, Boolean> {
+        var isFinal: Boolean
+        val tag = readUtf8StringUntil {
+            isFinal = it == ' '
+            it == ' ' || it == '-'
+        }
+
+        return tag to isFinal
     }
 
     // TODO: instead of always expecting T (a good result), take a map (status code -> expected reply)
-    public suspend inline fun <reified T : SmtpCommand> readSmtpCommand(): T {
-        // a message is not a real command. take care of it special
-        if (T::class == MailInputCommand::class) return MailInputCommand.Serializer.deserialize(this) as T
+    public suspend fun readSmtpCommand(): SmtpCommand {
+        val (rawTag, isFinal) = readSmtpCommandTag()
+        require(isFinal)
+        val tag = SmtpCommandTag.fromTag(rawTag) ?: error("unknown command: $rawTag")
 
-        return when (val command = readSmtpCommandKey()) {
-            "EHLO" -> EhloCommand.Serializer.deserialize(this) as T
-            "MAIL" -> MailCommand.Serializer.deserialize(this) as T
-            "RCPT" -> RecipientCommand.Serializer.deserialize(this) as T
-            "DATA" -> DataCommand.Serializer.deserialize(this) as T
-            "QUIT" -> QuitCommand.Serializer.deserialize(this) as T
-            "STAR" -> StartTlsCommand.Serializer.deserialize(this) as T
-            "AUTH" -> AuthenticationCommand.Serializer.deserialize(this) as T
-            else -> error("unknown command: $command")
+        return tag.serializer.deserialize(this)
+    }
+
+    public suspend fun readMailInput(): Message {
+        val data: ByteArray = DefaultBufferPool.use(32) { resultBuffer ->
+            for (byte in this) {
+                resultBuffer.write(byte)
+
+                val lastFive = resultBuffer[max(0, resultBuffer.writeIndex - 5)..resultBuffer.writeIndex]
+
+                // check if terminating sequence is found at the end of the result buffer
+                if (lastFive.contentEquals(MESSAGE_TERMINATING_SEQUENCE)) {
+                    resultBuffer.writeIndex -= 3 // the first <CRLF> is part of the body. don't need to remove it
+                    return@use resultBuffer.toByteArray()
+                }
+            }
+
+            TODO("input stopped but terminating sequence not found after data")
         }
+
+        return Message.fromText(data.decodeToString())
     }
 }
 

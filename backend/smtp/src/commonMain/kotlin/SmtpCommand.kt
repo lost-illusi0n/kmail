@@ -9,43 +9,61 @@ import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpWriter
 import dev.sitar.kmail.smtp.io.writeStringUtf8
 import kotlin.math.max
 
+public enum class SmtpCommandTag(public val serializer: SmtpCommandSerializer<*>) {
+    Helo(HeloCommand.Serializer),
+    Ehlo(EhloCommand.Serializer),
+    Mail(MailCommand.Serializer),
+    Rcpt(RecipientCommand.Serializer),
+    Data(DataCommand.Serializer),
+    Quit(QuitCommand.Serializer),
+    StartTls(StartTlsCommand.Serializer),
+    Auth(AuthenticationCommand.Serializer);
+
+    public companion object {
+        public fun fromTag(tag: String): SmtpCommandTag? {
+            return values().find { it.name.lowercase() == tag.lowercase() }
+        }
+    }
+}
+
 // TODO: make these easier to serialize
 public sealed interface SmtpCommand {
-    public val discriminator: String
+    public val tag: SmtpCommandTag
+}
+
+public interface SmtpCommandSerializer<T: SmtpCommand> {
+    public suspend fun serialize(command: T, output: AsyncSmtpWriter)
+
+    public suspend fun deserialize(input: AsyncSmtpReader): T
 }
 
 // TODO: this should be data. they shouldnt handle writing their identifiers
 
 public data class HeloCommand(val domain: String) : SmtpCommand {
-    override val discriminator: String = "HELO"
+    override val tag: SmtpCommandTag = SmtpCommandTag.Helo
 
-    public object Serializer {
-        public suspend fun serialize(command: HeloCommand, output: AsyncSmtpWriter) {
-            output.writeIsFinal()
+    public object Serializer: SmtpCommandSerializer<HeloCommand> {
+        public override suspend fun serialize(command: HeloCommand, output: AsyncSmtpWriter) {
             output.writeStringUtf8(command.domain)
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): HeloCommand {
-            require(input.readIsFinal())
+        public override suspend fun deserialize(input: AsyncSmtpReader): HeloCommand {
             return HeloCommand(input.readUtf8UntilSmtpEnding())
         }
     }
 }
 
 public data class EhloCommand(val data: String) : SmtpCommand {
-    override val discriminator: String = "EHLO"
+    override val tag: SmtpCommandTag = SmtpCommandTag.Ehlo
 
-    public object Serializer {
-        public suspend fun serialize(command: EhloCommand, output: AsyncSmtpWriter) {
-            output.writeIsFinal()
+    public object Serializer : SmtpCommandSerializer<EhloCommand> {
+        public override suspend fun serialize(command: EhloCommand, output: AsyncSmtpWriter) {
             output.writeStringUtf8(command.data)
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): EhloCommand {
-            require(input.readIsFinal())
-
+        public override suspend fun deserialize(input: AsyncSmtpReader): EhloCommand {
             return EhloCommand(input.readUtf8UntilSmtpEnding())
         }
     }
@@ -53,18 +71,15 @@ public data class EhloCommand(val data: String) : SmtpCommand {
 
 // TODO: parse and check to and from. there is a syntax they should follow
 public data class MailCommand(val from: String /* params */) : SmtpCommand {
-    override val discriminator: String = "MAIL"
+    override val tag: SmtpCommandTag = SmtpCommandTag.Mail
 
-    public object Serializer {
-        public suspend fun serialize(command: MailCommand, output: AsyncSmtpWriter) {
-            output.writeIsFinal()
+    public object Serializer : SmtpCommandSerializer<MailCommand> {
+        public override suspend fun serialize(command: MailCommand, output: AsyncSmtpWriter) {
             output.writeStringUtf8("FROM:${command.from}")
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): MailCommand {
-            require(input.readIsFinal())
-
+        public override suspend fun deserialize(input: AsyncSmtpReader): MailCommand {
             val fromRaw = input.readUtf8UntilSmtpEnding()
 
             if (!fromRaw.startsWith("FROM:")) TODO("incorrect syntax")
@@ -75,18 +90,15 @@ public data class MailCommand(val from: String /* params */) : SmtpCommand {
 }
 
 public data class RecipientCommand(val to: String /* params */) : SmtpCommand {
-    override val discriminator: String = "RCPT"
+    override val tag: SmtpCommandTag = SmtpCommandTag.Rcpt
 
-    public object Serializer {
-        public suspend fun serialize(command: RecipientCommand, output: AsyncSmtpWriter) {
-            output.writeIsFinal()
+    public object Serializer : SmtpCommandSerializer<RecipientCommand> {
+        public override suspend fun serialize(command: RecipientCommand, output: AsyncSmtpWriter) {
             output.writeStringUtf8("TO:${command.to}")
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): RecipientCommand {
-            require(input.readIsFinal())
-
+        public override suspend fun deserialize(input: AsyncSmtpReader): RecipientCommand {
             val toRaw = input.readUtf8UntilSmtpEnding()
 
             if (!toRaw.startsWith("TO:")) TODO("incorrect syntax")
@@ -97,14 +109,14 @@ public data class RecipientCommand(val to: String /* params */) : SmtpCommand {
 }
 
 public object DataCommand : SmtpCommand {
-    override val discriminator: String = "DATA"
+    override val tag: SmtpCommandTag = SmtpCommandTag.Data
 
-    public object Serializer {
-        public suspend fun serialize(output: AsyncSmtpWriter) {
+    public object Serializer : SmtpCommandSerializer<DataCommand> {
+        override suspend fun serialize(command: DataCommand, output: AsyncSmtpWriter) {
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): DataCommand {
+        public override suspend fun deserialize(input: AsyncSmtpReader): DataCommand {
             input.readUtf8UntilSmtpEnding()
             return DataCommand
         }
@@ -115,53 +127,20 @@ public object DataCommand : SmtpCommand {
     }
 }
 
-public data class MailInputCommand(val message: Message) : SmtpCommand {
-    public object Serializer {
-        private val TERMINATING_SEQUENCE = "\r\n.\r\n".toByteArray().fullSlice()
-
-        public suspend fun serialize(command: MailInputCommand, output: AsyncSmtpWriter) {
-            output.writeStringUtf8(command.message.asText())
-            output.write('.'.code.toByte())
-            output.endLine()
-        }
-
-        public suspend fun deserialize(input: AsyncSmtpReader) : MailInputCommand {
-            val data: ByteArray = DefaultBufferPool.use(32) { resultBuffer ->
-                for (byte in input) {
-                    resultBuffer.write(byte)
-
-                    val lastFive = resultBuffer[max(0, resultBuffer.writeIndex - 5)..resultBuffer.writeIndex]
-
-                    // check if terminating sequence is found at the end of the result buffer
-                    if (lastFive.contentEquals(TERMINATING_SEQUENCE)) {
-                        resultBuffer.writeIndex -= 3 // the first <CRLF> is part of the body. don't need to remove it
-                        return@use resultBuffer.toByteArray()
-                    }
-                }
-
-                TODO("input stopped but terminating sequence not found after data")
-            }
-
-            return MailInputCommand(Message.fromText(data.decodeToString()))
-        }
-    }
-
-    override val discriminator: String = ""
-}
-
 public object QuitCommand : SmtpCommand {
-    public object Serializer {
-        public suspend fun serialize(output: AsyncSmtpWriter) {
+    override val tag: SmtpCommandTag = SmtpCommandTag.Quit
+
+    public object Serializer : SmtpCommandSerializer<QuitCommand> {
+        override suspend fun serialize(command: QuitCommand, output: AsyncSmtpWriter) {
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): QuitCommand {
+        public override suspend fun deserialize(input: AsyncSmtpReader): QuitCommand {
+            println("DESERIALIZING QUIT")
             input.readUtf8UntilSmtpEnding()
             return QuitCommand
         }
     }
-
-    override val discriminator: String = "QUIT"
 
     override fun toString(): String {
         return "QuitCommand"
@@ -169,18 +148,14 @@ public object QuitCommand : SmtpCommand {
 }
 
 public object StartTlsCommand : SmtpCommand {
-    // kludge: technically the format of this command is STARTTLS but during the initial implementation of kmail
-    // a 4 character discriminator was chosen as all other commands adhered to it.
-    override val discriminator: String
-        get() = "STAR"
+    override val tag: SmtpCommandTag = SmtpCommandTag.StartTls
 
-    public object Serializer {
-        public suspend fun serialize(output: AsyncSmtpWriter) {
-            output.writeStringUtf8("TTLS") // the rest of the discriminator
+    public object Serializer : SmtpCommandSerializer<StartTlsCommand> {
+        override suspend fun serialize(command: StartTlsCommand, output: AsyncSmtpWriter) {
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): StartTlsCommand {
+        public override suspend fun deserialize(input: AsyncSmtpReader): StartTlsCommand {
             input.readUtf8UntilSmtpEnding() // the rest of the discriminator
             return StartTlsCommand
         }
@@ -192,18 +167,16 @@ public object StartTlsCommand : SmtpCommand {
 }
 
 public data class AuthenticationCommand(val mechanism: String, val response: SaslMechanism?): SmtpCommand {
-    override val discriminator: String = "AUTH"
+    override val tag: SmtpCommandTag = SmtpCommandTag.Auth
 
-    public object Serializer {
-        public suspend fun serialize(authentication: AuthenticationCommand, output: AsyncSmtpWriter) {
-            output.writeIsFinal()
+    public object Serializer : SmtpCommandSerializer<AuthenticationCommand> {
+        public override suspend fun serialize(authentication: AuthenticationCommand, output: AsyncSmtpWriter) {
             output.writeStringUtf8(authentication.mechanism)
             authentication.response?.let { output.writeStringUtf8(" ${authentication.response.encode()}") }
             output.endLine()
         }
 
-        public suspend fun deserialize(input: AsyncSmtpReader): AuthenticationCommand {
-            input.readIsFinal()
+        public override suspend fun deserialize(input: AsyncSmtpReader): AuthenticationCommand {
             val line = input.readUtf8UntilSmtpEnding()
 
             return when (val index = line.indexOf(' ')) {

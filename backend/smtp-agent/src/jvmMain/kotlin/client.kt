@@ -73,7 +73,7 @@ private suspend fun main(): Unit = coroutineScope {
     send(writer, DataCommand)
     got<SmtpReply.PositiveIntermediate>(reader)
 
-    send(writer, MailInputCommand(message {
+    val message = message {
         headers {
             +from(FROM)
             +toRcpt(RECIPIENT)
@@ -85,7 +85,10 @@ private suspend fun main(): Unit = coroutineScope {
         body {
             line("example")
         }
-    }))
+    }
+
+    writer.writeMessageData(message)
+    println("SUBMISSION CLIENT >>> $message")
     got<SmtpReply.PositiveCompletion>(reader)
 
     send(writer, QuitCommand)

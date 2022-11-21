@@ -96,7 +96,6 @@ class TransferAgent private constructor(
         }
     }
 
-    // TODO: STARTTLS
     // TODO: error handling. e.g. incorrect host/message recipient syntax
     private suspend fun transfer(mail: InternetMessage) {
         val session = TransferSession(mail, null)
@@ -105,7 +104,8 @@ class TransferAgent private constructor(
             println("MESSAGE (${mail.queueId}) READY FOR TRANSFER")
 
             // TODO: make this robust
-            val host = mail.envelope.recipientAddress.split('@')[1].removeSuffix(">")
+            // TODO: send to all recipients
+            val host = mail.envelope.recipientAddresses[0].split('@')[1].removeSuffix(">")
 
             println("RESOLVING HOST $host")
 
@@ -170,8 +170,14 @@ class TransferAgent private constructor(
                 }
 
                 step {
-                    send(RecipientCommand(mail.envelope.recipientAddress))
-                    recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+                    var last: StepProgression = StepProgression.Continue
+
+                    mail.envelope.recipientAddresses.forEach {
+                        send(RecipientCommand(it))
+                        last = recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+                    }
+
+                    last
                 }
 
                 step {
@@ -180,7 +186,7 @@ class TransferAgent private constructor(
                 }
 
                 step {
-                    send(MailInputCommand(mail.message))
+                    writer.writeMessageData(mail.message)
                     recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
                 }
 
