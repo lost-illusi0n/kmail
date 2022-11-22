@@ -14,20 +14,21 @@ public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, Async
         private val MESSAGE_TERMINATING_SEQUENCE = "\r\n.\r\n".toByteArray().fullSlice()
     }
 
-    private suspend fun readSmtpCommandTag(): Pair<String, Boolean> {
-        var isFinal: Boolean
+    private suspend fun readSmtpCommandTag(): String {
+        var lastChar = '\u0000'
+
         val tag = readUtf8StringUntil {
-            isFinal = it == ' '
-            it == ' ' || it == '-'
+            val t = it == ' ' || (lastChar == '\r' && it == '\n')
+            lastChar = it
+            t
         }
 
-        return tag to isFinal
+        return if (lastChar == '\n') tag.dropLast(1) else tag
     }
 
     // TODO: instead of always expecting T (a good result), take a map (status code -> expected reply)
     public suspend fun readSmtpCommand(): SmtpCommand {
-        val (rawTag, isFinal) = readSmtpCommandTag()
-        require(isFinal)
+        val rawTag = readSmtpCommandTag()
         val tag = SmtpCommandTag.fromTag(rawTag) ?: error("unknown command: $rawTag")
 
         return tag.serializer.deserialize(this)

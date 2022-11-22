@@ -44,6 +44,7 @@ public data class HeloCommand(val domain: String) : SmtpCommand {
 
     public object Serializer: SmtpCommandSerializer<HeloCommand> {
         public override suspend fun serialize(command: HeloCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8(command.domain)
             output.endLine()
         }
@@ -59,6 +60,7 @@ public data class EhloCommand(val data: String) : SmtpCommand {
 
     public object Serializer : SmtpCommandSerializer<EhloCommand> {
         public override suspend fun serialize(command: EhloCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8(command.data)
             output.endLine()
         }
@@ -75,6 +77,7 @@ public data class MailCommand(val from: String /* params */) : SmtpCommand {
 
     public object Serializer : SmtpCommandSerializer<MailCommand> {
         public override suspend fun serialize(command: MailCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8("FROM:${command.from}")
             output.endLine()
         }
@@ -94,6 +97,7 @@ public data class RecipientCommand(val to: String /* params */) : SmtpCommand {
 
     public object Serializer : SmtpCommandSerializer<RecipientCommand> {
         public override suspend fun serialize(command: RecipientCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8("TO:${command.to}")
             output.endLine()
         }
@@ -117,7 +121,6 @@ public object DataCommand : SmtpCommand {
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): DataCommand {
-            input.readUtf8UntilSmtpEnding()
             return DataCommand
         }
     }
@@ -136,8 +139,6 @@ public object QuitCommand : SmtpCommand {
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): QuitCommand {
-            println("DESERIALIZING QUIT")
-            input.readUtf8UntilSmtpEnding()
             return QuitCommand
         }
     }
@@ -156,7 +157,6 @@ public object StartTlsCommand : SmtpCommand {
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): StartTlsCommand {
-            input.readUtf8UntilSmtpEnding() // the rest of the discriminator
             return StartTlsCommand
         }
     }
@@ -171,6 +171,7 @@ public data class AuthenticationCommand(val mechanism: String, val response: Sas
 
     public object Serializer : SmtpCommandSerializer<AuthenticationCommand> {
         public override suspend fun serialize(authentication: AuthenticationCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8(authentication.mechanism)
             authentication.response?.let { output.writeStringUtf8(" ${authentication.response.encode()}") }
             output.endLine()

@@ -36,7 +36,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
         }
     }
 
-    private val coroutineScope = CoroutineScope(coroutineContext + SupervisorJob() + CoroutineName("SUBMISSION-AGENT"))
+    private val coroutineScope = CoroutineScope(coroutineContext + CoroutineName("SUBMISSION-AGENT"))
 
     private val _incomingMail: Channel<InternetMessage> = Channel()
 
@@ -88,8 +88,13 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
             return when (val resp = recvChecked()) {
                 null -> null
                 is T -> resp
-                else -> TODO("handle unexpected command")
+                else -> todo("handle unexpected command")
             }
+        }
+
+        fun todo(reason: String): Nothing {
+            println(reason)
+            TODO(reason)
         }
     }
 
@@ -152,10 +157,10 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
                             if (transport.isImplicitlyEncrypted || isUpgraded) {
                                 val auth = recvExpected<AuthenticationCommand>() ?: break
 
-                                if (auth.response == null) TODO("handle null initial response")
+                                if (auth.response == null) todo("handle null initial response")
 
                                 authenticatedUser = authenticationManager.authenticate(auth.response!!)
-                                    ?: TODO("could not authenticate user")
+                                    ?: todo("could not authenticate user")
 
                                 isAuthenticated = true
 
@@ -191,7 +196,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
 
                         val canSend = authenticatedUser?.let { authenticationManager?.canSend(it, mail.from) } ?: true
 
-                        if (!canSend) TODO("authenticated user is not authorized to send as ${mail.from}")
+                        if (!canSend) todo("authenticated user is not authorized to send as ${mail.from}")
 
                         send(OkCompletion("Ok."))
 
@@ -216,7 +221,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
                                 (state as State.Recipient).progress(message)
                             }
 
-                            else -> TODO("unexpected command")
+                            else -> todo("unexpected command")
                         }
                     }
 
@@ -229,6 +234,8 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
                         state = State.Authorized
                     }
                 }
+
+                println(state)
             }
         }
     }

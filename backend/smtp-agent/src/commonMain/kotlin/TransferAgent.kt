@@ -4,6 +4,7 @@ import dev.sitar.dns.dnsResolver
 import dev.sitar.dns.records.MXResourceRecord
 import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
+import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
 import dev.sitar.kmail.smtp.frames.replies.*
@@ -48,7 +49,7 @@ class TransferAgent private constructor(
     }
 
     private data class TransferSession(
-        val message: InternetMessage,
+        val id: String,
         var exchange: String?,
     ) {
         lateinit var connection: SmtpTransportConnection
@@ -62,11 +63,11 @@ class TransferAgent private constructor(
         }
 
         fun println(content: String) {
-            kotlin.io.println("TRANSFER (${message.queueId}/$exchange): $content")
+            kotlin.io.println("TRANSFER ($id/$exchange): $content")
         }
 
         suspend inline fun <reified T : SmtpCommand> send(command: T) {
-            kotlin.io.println("TRANSFER (${message.queueId}/$exchange) >>> $command")
+            kotlin.io.println("TRANSFER ($id/$exchange) >>> $command")
 
             writer.writeCommand(command)
         }
@@ -78,7 +79,7 @@ class TransferAgent private constructor(
                 reply = reply.tryAs<C, T>() as SmtpReply<*>
             }
 
-            kotlin.io.println("TRANSFER (${message.queueId}/$exchange) <<< $reply")
+            kotlin.io.println("TRANSFER ($id/$exchange) <<< $reply")
 
             return reply
         }
@@ -90,7 +91,7 @@ class TransferAgent private constructor(
                 (reply.tryAs<C, T>() as? SmtpReply<*>)?.let { reply = it }
             }
 
-            kotlin.io.println("TRANSFER (${message.queueId}/$exchange) <<< $reply")
+            kotlin.io.println("TRANSFER ($id/$exchange) <<< $reply")
 
             return reply.coerceToStepProgression()
         }
@@ -98,110 +99,106 @@ class TransferAgent private constructor(
 
     // TODO: error handling. e.g. incorrect host/message recipient syntax
     private suspend fun transfer(mail: InternetMessage) {
-        val session = TransferSession(mail, null)
+        val session = TransferSession(mail.queueId, null)
 
         with (session) {
             println("MESSAGE (${mail.queueId}) READY FOR TRANSFER")
 
-            // TODO: make this robust
-            // TODO: send to all recipients
-            val host = mail.envelope.recipientAddresses[0].split('@')[1].removeSuffix(">")
+            mail.envelope.recipientAddresses.forEach { mail.sendTo(it) }
+        }
+    }
 
-            println("RESOLVING HOST $host")
+    private suspend fun InternetMessage.sendTo(rcpt: String) = with(TransferSession(queueId, null)) {
+        val host = rcpt.split('@')[1].removeSuffix(">")
 
-            val response = resolver.resolveRecursively(host, GOOGLE_DNS) {
-                qType = ResourceType.MX
+        println("RESOLVING HOST $host")
+
+        val response = resolver.resolveRecursively(host, GOOGLE_DNS) {
+            qType = ResourceType.MX
+        }
+
+        println("RESOLVED ${response.orEmpty().size} MX RECORDS")
+        println(response.toString())
+
+        response.orEmpty()
+            .filterIsInstance<MXResourceRecord>()
+            .sortedBy { it.data.preference }
+            .firstNotNullOfOrNull { connector.connect(it.data.exchange)?.run { it.data.exchange to this } }
+            ?.let { (exchange, connection) ->
+                this.exchange = exchange
+                this.connection = connection
+            } ?: TODO("could not connect to any exchange servers")
+
+        connection = connector.connect(exchange!!) ?: error("no mx records work")
+        updateChannels()
+
+        var isEncrypted = false
+
+        machine {
+            step {
+                recvCoerced<SmtpReply.PositiveCompletion, GreetCompletion>()
             }
 
-            println("RESOLVED ${response.orEmpty().size} MX RECORDS")
-            println(response.toString())
+            step {
+                send(EhloCommand(data.host))
 
-            response.orEmpty()
-                .filterIsInstance<MXResourceRecord>()
-                .sortedBy { it.data.preference }
-                .firstNotNullOfOrNull { connector.connect(it.data.exchange)?.run { it.data.exchange to this } }
-                ?.let { (exchange, connection) ->
-                    this.exchange = exchange
-                    this.connection = connection
-                } ?: TODO("could not connect to any exchange servers")
+                val ehlo = recv<SmtpReply.PositiveCompletion, EhloCompletion>()
 
-            connection = connector.connect(exchange!!) ?: error("no mx records work")
-            updateChannels()
+                if (ehlo !is EhloCompletion) return@step StepProgression.Abort("EXPECTED EHLO REPLY. GOT: $ehlo")
 
-            var isEncrypted = false
+                if (connection.isImplicitlyEncrypted) return@step StepProgression.Continue
 
-            machine {
-                step {
-                    recvCoerced<SmtpReply.PositiveCompletion, GreetCompletion>()
+                if (isEncrypted || !ehlo.capabilities.containsKey(STARTTLS)) return@step StepProgression.Continue
+
+                send(StartTlsCommand)
+
+                when (val resp = recv<SmtpReply.PositiveCompletion, ReadyToStartTlsCompletion>()) {
+                    is SmtpReply.PermanentNegative -> return@step StepProgression.Abort("RECEIVED NO TO STARTTLS: $resp")
+                    is SmtpReply.TransientNegative -> TODO("figure out what we should do")
+                    else -> {}
                 }
 
-                step {
-                    send(EhloCommand(data.host))
+                connection.upgradeToTls()
+                isEncrypted = true
+                updateChannels()
 
-                    val ehlo = recv<SmtpReply.PositiveCompletion, EhloCompletion>()
+                println("SUCCESSFULLY UPGRADED TO TLS")
 
-                    if (ehlo !is EhloCompletion) return@step StepProgression.Abort("EXPECTED EHLO REPLY. GOT: $ehlo")
+                StepProgression.Retry
+            }
 
-                    if (connection.isImplicitlyEncrypted) return@step StepProgression.Continue
+            // TODO: implement pipelining
+            step {
+                send(MailCommand(envelope.originatorAddress))
+                recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+            }
 
-                    if (isEncrypted || !ehlo.capabilities.containsKey(STARTTLS)) return@step StepProgression.Continue
+            step {
+                send(RecipientCommand(rcpt))
+                recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+            }
 
-                    send(StartTlsCommand)
+            step {
+                send(DataCommand)
+                recvCoerced<SmtpReply.PositiveIntermediate, StartMailInputIntermediary>()
+            }
 
-                    when (val resp = recv<SmtpReply.PositiveCompletion, ReadyToStartTlsCompletion>()) {
-                        is SmtpReply.PermanentNegative -> return@step StepProgression.Abort("RECEIVED NO TO STARTTLS: $resp")
-                        is SmtpReply.TransientNegative -> TODO("figure out what we should do")
-                        else -> {}
-                    }
+            step {
+                writer.writeMessageData(message)
+                recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+            }
 
-                    connection.upgradeToTls()
-                    isEncrypted = true
-                    updateChannels()
+            stop {
+                if (it is StopReason.Abrupt) println("STOPPING TRANSFER SESSION DUE TO: ${it.reason}")
 
-                    println("SUCCESSFULLY UPGRADED TO TLS")
+                send(QuitCommand)
 
-                    StepProgression.Retry
-                }
-
-                // TODO: implement pipelining
-                step {
-                    send(MailCommand(mail.envelope.originatorAddress))
+                try {
                     recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
+                } catch (_: Throwable) {
                 }
 
-                step {
-                    var last: StepProgression = StepProgression.Continue
-
-                    mail.envelope.recipientAddresses.forEach {
-                        send(RecipientCommand(it))
-                        last = recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
-                    }
-
-                    last
-                }
-
-                step {
-                    send(DataCommand)
-                    recvCoerced<SmtpReply.PositiveIntermediate, StartMailInputIntermediary>()
-                }
-
-                step {
-                    writer.writeMessageData(mail.message)
-                    recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
-                }
-
-                stop {
-                    if (it is StopReason.Abrupt) println("STOPPING TRANSFER SESSION DUE TO: ${it.reason}")
-
-                    send(QuitCommand)
-
-                    try {
-                        recvCoerced<SmtpReply.PositiveCompletion, OkCompletion>()
-                    } catch (_: Throwable) {
-                    }
-
-                    connection.close()
-                }
+                connection.close()
             }
         }
     }

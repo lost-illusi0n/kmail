@@ -1,9 +1,7 @@
 package dev.sitar.kmail.smtp.agent.transports.client
 
 import dev.sitar.kio.async.readers.AsyncReader
-import dev.sitar.kmail.smtp.io.AsyncWriterStream
-import dev.sitar.kmail.smtp.io.toAsyncReader
-import dev.sitar.kmail.smtp.io.toAsyncWriterStream
+import dev.sitar.kmail.smtp.io.*
 import io.ktor.network.sockets.*
 import io.ktor.network.tls.*
 import io.ktor.utils.io.*

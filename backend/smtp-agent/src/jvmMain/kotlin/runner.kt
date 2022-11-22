@@ -2,8 +2,7 @@ package dev.sitar.kmail.smtp.agent
 
 import dev.sitar.kmail.smtp.PlainSaslMechanism
 import dev.sitar.kmail.smtp.SaslMechanism
-import dev.sitar.kmail.smtp.agent.transports.server.PlainTextSmtpServerTransportClient
-import dev.sitar.kmail.smtp.agent.transports.server.TlsCapableSmtpServerTransportConnection
+import dev.sitar.kmail.smtp.agent.transports.client.TlsCapableSmtpTransferTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.TlsCapableSmtpSubmissionServerTransportClient
 import kotlinx.coroutines.coroutineScope
 import java.security.KeyStore
@@ -29,7 +28,7 @@ suspend fun main(): Unit = coroutineScope {
     val trustManagerFactory = TrustManagerFactory.getInstance("SunX509")
     trustManagerFactory.init(keyStore)
 
-    sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
+    sslContext.init(keyManagerFactory.keyManagers, null, null)
 
     val smtpSubmissionAgent = SubmissionAgent.withHostname(
         HOSTNAME,
@@ -38,12 +37,16 @@ suspend fun main(): Unit = coroutineScope {
     )
 
     // TODO: mail from the submission agent should be verified, e.g. google requires a message id
-    val transferAgent = TransferAgent.fromOutgoingMessages(HOSTNAME, smtpSubmissionAgent.incomingMail)
+    val transferAgent = TransferAgent.fromOutgoingMessages(
+        HOSTNAME,
+        smtpSubmissionAgent.incomingMail,
+        connector = DefaultTransferSessionSmtpConnector(100, TlsCapableSmtpTransferTransportClient(SSLContext.getDefault()))
+    )
 
     smtpSubmissionAgent.start()
 }
 
-data class User(val email: String): SmtpAuthenticatedUser
+data class User(val email: String?) : SmtpAuthenticatedUser
 
 object OurSmtpAuthenticationManager: SubmissionAuthenticationManager<User> {
     override fun authenticate(mechanism: SaslMechanism): User? {
@@ -54,6 +57,6 @@ object OurSmtpAuthenticationManager: SubmissionAuthenticationManager<User> {
     }
 
     override fun canSend(user: User, from: String): Boolean {
-        return user.email == from
+        return (user.email?.takeIf { it.isNotEmpty() } ?: from) == from
     }
 }
