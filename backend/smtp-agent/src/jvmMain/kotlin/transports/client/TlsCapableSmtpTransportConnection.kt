@@ -26,6 +26,12 @@ actual class TlsCapableSmtpTransportConnection actual constructor(
 ) : SmtpTransportConnection {
     private var isUpgraded = false
 
+    override val supportsClientTls: Boolean
+        get() = true
+
+    override val supportsServerTls: Boolean
+        get() = true
+
     override val remote: String
         get() = socket.remoteSocketAddress.toString()
 

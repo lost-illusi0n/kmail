@@ -26,7 +26,6 @@ public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, Async
         return if (lastChar == '\n') tag.dropLast(1) else tag
     }
 
-    // TODO: instead of always expecting T (a good result), take a map (status code -> expected reply)
     public suspend fun readSmtpCommand(): SmtpCommand {
         val rawTag = readSmtpCommandTag()
         val tag = SmtpCommandTag.fromTag(rawTag) ?: error("unknown command: $rawTag")

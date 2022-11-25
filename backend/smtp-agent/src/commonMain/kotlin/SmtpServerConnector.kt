@@ -3,6 +3,9 @@ package dev.sitar.kmail.smtp.agent
 import dev.sitar.kmail.smtp.agent.transports.client.*
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import mu.KotlinLogging
+
+private val logger = KotlinLogging.logger { }
 
 interface SmtpServerConnector {
     suspend fun connect(server: String): SmtpTransportConnection?
@@ -11,7 +14,7 @@ interface SmtpServerConnector {
 class DefaultTransferSessionSmtpConnector(val timeout: Long = 500, vararg val additionalClients: SmtpTransportClient) :
     SmtpServerConnector {
     companion object {
-        val STANDARD_SERVICES = listOf(
+        val STANDARD_SERVICES = setOf(
             ImplicitTlsSmtpTransportClient,
             PlainTextSmtpTransferTransportClient
         )
@@ -20,7 +23,7 @@ class DefaultTransferSessionSmtpConnector(val timeout: Long = 500, vararg val ad
     override suspend fun connect(server: String): SmtpTransportConnection? {
         for (service in additionalClients.toList() + STANDARD_SERVICES) {
             val connection = withTimeoutOrNull(timeout) {
-                println("SMTP SERVER CONNECTOR: ATTEMPTING CONNECTION TO $server USING $service")
+                logger.debug { "Attempting to connect to $server using ${service.name}." }
                 service.connect(server)
             }
 
@@ -36,7 +39,7 @@ class DefaultSubmissionSessionSmtpConnector(
     vararg val additionalClients: SmtpTransportClient
 ) : SmtpServerConnector {
     companion object {
-        val STANDARD_SERVICES = listOf(
+        val STANDARD_SERVICES = setOf(
             ImplicitTlsSmtpTransportClient,
             PlainTextSmtpSubmissionTransportClient,
         )
@@ -46,7 +49,7 @@ class DefaultSubmissionSessionSmtpConnector(
         for (service in additionalClients.toList() + STANDARD_SERVICES) {
             try {
                 return withTimeout(timeout) {
-                    println("SMTP SERVER CONNECTOR: ATTEMPTING CONNECTION TO $server USING $service")
+                    logger.debug { "Attempting to connect to $server using ${service.name}." }
                     service.connect(server)
                 }
             } catch (e: Throwable) {

@@ -12,7 +12,6 @@ public class AsyncSmtpClientReader(reader: AsyncReader) : AsyncSmtpReader, Async
         return readStringUtf8(3).toInt()
     }
 
-    // TODO: instead of always expecting T (a good result), take a map (status code -> expected reply)
     public suspend fun readSmtpReply(): SmtpReply<*> {
         val body = deserializeBody()
         val code = body.first().first

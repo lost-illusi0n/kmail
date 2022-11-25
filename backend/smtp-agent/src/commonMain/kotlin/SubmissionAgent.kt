@@ -10,42 +10,40 @@ import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpServerReader
 import dev.sitar.kmail.smtp.io.smtp.writer.asAsyncSmtpServerWriter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
+import mu.KotlinLogging
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
 
-// TODO: transport encryption
-class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
-    val data: SmtpServerData,
-    val server: SmtpServerTransportConnection,
+private val logger = KotlinLogging.logger { }
+
+data class SubmissionConfig(
+    val host: String,
+    val requiresEncryption: Boolean
+)
+
+class SubmissionAgent<User : SmtpAuthenticatedUser>(
+    val config: SubmissionConfig,
+    val serverTransport: SmtpServerTransportConnection,
     val authenticationManager: SubmissionAuthenticationManager<User>,
-    coroutineContext: CoroutineContext
+    coroutineContext: CoroutineContext = EmptyCoroutineContext
 ) {
-    companion object {
-        // TODO: we should take some extra information to better process incoming messages as a msu
-        suspend fun <User : SmtpAuthenticatedUser> withHostname(
-            host: String,
-            authenticationManager: SubmissionAuthenticationManager<User>,
-            client: SmtpServerTransportClient
-        ): SubmissionAgent<User> {
-            val connection = client.bind()
-            println("SUBMISSION: STARTED LISTENING")
-
-            return SubmissionAgent(SmtpServerData(host), connection, authenticationManager, coroutineContext)
-        }
-    }
-
-    private val coroutineScope = CoroutineScope(coroutineContext + CoroutineName("SUBMISSION-AGENT"))
+    private val scope = CoroutineScope(coroutineContext + Job() + CoroutineName("submission-agent"))
 
     private val _incomingMail: Channel<InternetMessage> = Channel()
+    val incomingMail: ReceiveChannel<InternetMessage> = _incomingMail
 
-    val incomingMail: Flow<InternetMessage> = _incomingMail.consumeAsFlow()
-    suspend fun start() = coroutineScope {
-        while (isActive) {
-            val socket = server.accept()
+    fun launch() {
+        scope.launch {
+            while (isActive) {
+                val socket = serverTransport.accept()
+                logger.debug("Accepted a connection from ${socket.remote}.")
 
-            launch { listen(socket) }
+                launch { listen(socket) }
+            }
         }
     }
 
@@ -55,12 +53,8 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
         var reader = connection.reader.asAsyncSmtpServerReader()
         var writer = connection.writer.asAsyncSmtpServerWriter()
 
-        fun println(message: String) {
-            kotlin.io.println("SUBMISSION(${connection.remote}): $message")
-        }
-
-        suspend inline fun <reified T : SmtpReply<*>> send(reply: T) {
-            kotlin.io.println("SUBMISSION(${connection.remote}) >>> $reply")
+        suspend fun send(reply: SmtpReply<*>) {
+            logger.trace { "SUBMISSION(${connection.remote}) >>> $reply" }
 
             writer.writeReply(reply)
         }
@@ -68,7 +62,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
         suspend inline fun recv(): SmtpCommand {
             val resp = reader.readSmtpCommand()
 
-            kotlin.io.println("SUBMISSION(${connection.remote}) <<< $resp")
+            logger.trace { "SUBMISSION(${connection.remote}) <<< $resp" }
 
             return resp
         }
@@ -93,7 +87,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
         }
 
         fun todo(reason: String): Nothing {
-            println(reason)
+            logger.error(reason)
             TODO(reason)
         }
     }
@@ -108,18 +102,17 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
         object Authorized : State
 
         data class Recipient(
-            val from: String,
-            val recipients: List<String>
+            val from: Path,
+            val recipients: List<Path>
         ) : State {
             fun progress(message: Message) = GotMail(from, recipients, message)
         }
 
-        data class GotMail(val from: String, val recipients: List<String>, val message: Message) : State
+        data class GotMail(val from: Path, val recipients: List<Path>, val message: Message) : State
     }
 
-    // TODO!!: this should be a state machine
     private suspend fun listen(transport: SmtpTransportConnection) {
-        println("ACCEPTED A CONNECTION FROM ${transport.remote}")
+        logger.info { "Accepted submission from ${transport.remote}." }
 
         val session = SubmissionSession(transport)
 
@@ -143,11 +136,16 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
                         recvExpected<EhloCommand>() ?: break
 
                         val capabilities: Map<EhloKeyword, EhloParam> = buildMap {
-                            if (!isUpgraded) put("STARTTLS", null)
+                            if (!transport.isImplicitlyEncrypted && !isUpgraded && transport.supportsServerTls) {
+                                put("STARTTLS", null)
+                            } else if (config.requiresEncryption) {
+                                logger.error("Server requires encryption but it cannot provide it!")
+                                TODO("handle no encryption.")
+                            }
                             else if (!isAuthenticated) put("AUTH", "PLAIN")
                         }
 
-                        send(EhloCompletion(data.host, "Hello, I am Kmail!", capabilities))
+                        send(EhloCompletion(config.host, "Hello, I am Kmail!", capabilities))
                         state = State.Initiated
                     }
 
@@ -160,11 +158,15 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
                                 if (auth.response == null) todo("handle null initial response")
 
                                 authenticatedUser = authenticationManager.authenticate(auth.response!!)
-                                    ?: todo("could not authenticate user")
+
+                                if (authenticatedUser == null) {
+                                    send(SmtpReply.PermanentNegative.Default(535, listOf("Unauthorized.")))
+                                    continue
+                                }
 
                                 isAuthenticated = true
 
-                                send(OkCompletion("Authorized."))
+                                send(SmtpReply.PositiveCompletion.Default(235, listOf("Authorized.")))
 
                                 state = State.Authorized
                                 continue
@@ -227,6 +229,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
 
                     is State.GotMail -> (state as State.GotMail).let {
                         val message = InternetMessage(Envelope(it.from, it.recipients), it.message)
+                        logger.info("Submission has received email as ${message.queueId}.\n{}", message)
                         send(OkCompletion("Queued as ${message.queueId}"))
 
                         _incomingMail.send(message)
@@ -235,8 +238,15 @@ class SubmissionAgent<User : SmtpAuthenticatedUser> private constructor(
                     }
                 }
 
-                println(state)
+                logger.debug { "Submission from ${transport.remote} is now $state." }
             }
+
+            logger.info { "Submission from ${transport.remote} has been closed." }
         }
+    }
+
+    fun close() {
+        serverTransport.close()
+        scope.cancel()
     }
 }

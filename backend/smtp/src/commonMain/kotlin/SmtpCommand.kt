@@ -4,10 +4,12 @@ import dev.sitar.kio.buffers.DefaultBufferPool
 import dev.sitar.kio.fullSlice
 import dev.sitar.kio.use
 import dev.sitar.kmail.message.Message
+import dev.sitar.kmail.smtp.io.readStringUtf8
 import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpReader
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpWriter
 import dev.sitar.kmail.smtp.io.writeStringUtf8
 import kotlin.math.max
+import kotlin.system.exitProcess
 
 public enum class SmtpCommandTag(public val serializer: SmtpCommandSerializer<*>) {
     Helo(HeloCommand.Serializer),
@@ -36,8 +38,6 @@ public interface SmtpCommandSerializer<T: SmtpCommand> {
 
     public suspend fun deserialize(input: AsyncSmtpReader): T
 }
-
-// TODO: this should be data. they shouldnt handle writing their identifiers
 
 public data class HeloCommand(val domain: String) : SmtpCommand {
     override val tag: SmtpCommandTag = SmtpCommandTag.Helo
@@ -71,43 +71,42 @@ public data class EhloCommand(val data: String) : SmtpCommand {
     }
 }
 
-// TODO: parse and check to and from. there is a syntax they should follow
-public data class MailCommand(val from: String /* params */) : SmtpCommand {
+public data class MailCommand(val from: Path /* params */) : SmtpCommand {
     override val tag: SmtpCommandTag = SmtpCommandTag.Mail
 
     public object Serializer : SmtpCommandSerializer<MailCommand> {
         public override suspend fun serialize(command: MailCommand, output: AsyncSmtpWriter) {
             output.writeIsFinal()
-            output.writeStringUtf8("FROM:${command.from}")
+            output.writeStringUtf8("FROM:${command.from.asText()}")
             output.endLine()
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): MailCommand {
-            val fromRaw = input.readUtf8UntilSmtpEnding()
+            if (input.readStringUtf8(5) != "FROM:") TODO("incorrect syntax")
 
-            if (!fromRaw.startsWith("FROM:")) TODO("incorrect syntax")
+            val path = Path.fromText(input.readUtf8UntilSmtpEnding()) ?: TODO("incorrect syntax")
 
-            return MailCommand(fromRaw.drop(5))
+            return MailCommand(path)
         }
     }
 }
 
-public data class RecipientCommand(val to: String /* params */) : SmtpCommand {
+public data class RecipientCommand(val to: Path /* params */) : SmtpCommand {
     override val tag: SmtpCommandTag = SmtpCommandTag.Rcpt
 
     public object Serializer : SmtpCommandSerializer<RecipientCommand> {
         public override suspend fun serialize(command: RecipientCommand, output: AsyncSmtpWriter) {
             output.writeIsFinal()
-            output.writeStringUtf8("TO:${command.to}")
+            output.writeStringUtf8("TO:${command.to.asText()}")
             output.endLine()
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): RecipientCommand {
-            val toRaw = input.readUtf8UntilSmtpEnding()
+            if (input.readStringUtf8(3) != "TO:") TODO("incorrect syntax")
 
-            if (!toRaw.startsWith("TO:")) TODO("incorrect syntax")
+            val path = Path.fromText(input.readUtf8UntilSmtpEnding()) ?: TODO("incorrect syntax")
 
-            return RecipientCommand(toRaw.drop(3))
+            return RecipientCommand(path)
         }
     }
 }

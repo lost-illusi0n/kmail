@@ -7,6 +7,8 @@ include("message-format")
 
 include("smtp-agent")
 
+include("runner")
+
 // TODO: publish dnskotlin
 includeBuild("../../dnskotlin") {
     dependencySubstitution {

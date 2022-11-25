@@ -1,5 +1,6 @@
 package dev.sitar.kmail.smtp.io.smtp.writer
 
+import dev.sitar.kmail.smtp.SMTP_LINE_ENDING
 import dev.sitar.kmail.smtp.frames.replies.*
 import dev.sitar.kmail.smtp.io.AsyncWriterStream
 import dev.sitar.kmail.smtp.io.writeStringUtf8
@@ -9,19 +10,12 @@ public class AsyncSmtpServerWriter(writer: AsyncWriterStream) : AsyncSmtpWriter,
         writeStringUtf8(status.toString())
     }
 
-    public suspend inline fun <reified T : SmtpReply<*>> writeReply(reply: T) {
-        writeStatusCode(reply.code)
-
-        when (T::class) {
-            ReadyToStartTlsCompletion::class -> ReadyToStartTlsCompletion.serialize(
-                this,
-                reply as ReadyToStartTlsCompletion
-            )
-
-            GreetCompletion::class -> GreetCompletion.serialize(this, reply as GreetCompletion)
-            OkCompletion::class -> OkCompletion.serialize(this, reply as OkCompletion)
-            EhloCompletion::class -> EhloCompletion.serialize(this, reply as EhloCompletion)
-            StartMailInputIntermediary::class -> StartMailInputIntermediary.serialize(this, reply as StartMailInputIntermediary)
+    public suspend fun writeReply(reply: SmtpReply<*>) {
+        reply.lines.forEachIndexed { i, line ->
+            writeStatusCode(reply.code)
+            writeIsFinal(i == reply.lines.size - 1)
+            writeStringUtf8(line)
+            endLine()
         }
 
         flush()

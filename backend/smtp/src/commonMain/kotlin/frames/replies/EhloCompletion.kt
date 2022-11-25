@@ -16,7 +16,7 @@ public data class EhloCompletion(
 ) :
     SmtpReply.PositiveCompletion by SmtpReply.PositiveCompletion.Default(
         code = 250,
-        lines = listOf("$domain${greet?.let { " $it" }}") + capabilities.map { (key, param) -> "$key${param?.let { " $it" }}" }
+        lines = listOf("$domain${greet?.let { " $it" }}") + capabilities.map { (key, param) -> "$key${param?.let { " $it" } ?: ""}" }
     ) {
     public companion object {
         public fun from(lines: List<String>): EhloCompletion {

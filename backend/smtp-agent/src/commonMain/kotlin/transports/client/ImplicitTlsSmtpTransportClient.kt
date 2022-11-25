@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlin.coroutines.coroutineContext
 
 object ImplicitTlsSmtpTransportClient : SmtpSocketTransportClient {
+    override val name: String = "Ktor Implicit TLS"
+
     override suspend fun fromConnectedSocket(socket: Socket): SmtpTransportConnection {
         return SmtpSocketTransportConnection(socket.tls(coroutineContext), isImplicitlyEncrypted = true)
     }

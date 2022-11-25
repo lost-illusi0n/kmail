@@ -4,6 +4,8 @@ import dev.sitar.kmail.smtp.agent.transports.SslContext
 import javax.net.SocketFactory
 
 actual class TlsCapableSmtpSubmissionTransportClient actual constructor(val context: SslContext) : SmtpTransportClient {
+    override val name: String = "Java Submission Socket"
+
     actual fun fromSocket(socket: TlsCapableSocket, isClient: Boolean): TlsCapableSmtpTransportConnection {
         return TlsCapableSmtpTransportConnection(context, socket, isClient)
     }

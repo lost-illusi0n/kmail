@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 
 
 object PlainTextSmtpTransferTransportClient : SmtpSocketTransportClient {
+    override val name: String = "Ktor Transfer Socket"
+
     override suspend fun fromConnectedSocket(socket: Socket): SmtpTransportConnection {
         return SmtpSocketTransportConnection(socket)
     }

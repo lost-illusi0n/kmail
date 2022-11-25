@@ -4,7 +4,6 @@ import dev.sitar.dns.dnsResolver
 import dev.sitar.dns.records.MXResourceRecord
 import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
-import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
 import dev.sitar.kmail.smtp.frames.replies.*
@@ -14,38 +13,41 @@ import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpClientWriter
 import dev.sitar.kmail.smtp.io.smtp.writer.asAsyncSmtpClientWriter
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import mu.KotlinLogging
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
-class TransferAgent private constructor(
-    val data: SmtpServerData,
-    val connector: SmtpServerConnector,
+private val logger = KotlinLogging.logger { }
+
+data class TransferConfig(
+    val host: String,
+    val requireEncryption: Boolean,
+)
+
+class TransferAgent(
+    val config: TransferConfig,
     val outgoingMessages: Flow<InternetMessage>,
-    coroutineContext: CoroutineContext
+    val connector: SmtpServerConnector = DefaultTransferSessionSmtpConnector(),
+    coroutineContext: CoroutineContext = EmptyCoroutineContext
 ) {
-    companion object {
+    private companion object {
         private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
-
-        suspend fun fromOutgoingMessages(
-            hostname: String,
-            outgoingMessages: Flow<InternetMessage>,
-            connector: SmtpServerConnector = DefaultTransferSessionSmtpConnector()
-        ): TransferAgent {
-            return TransferAgent(SmtpServerData(hostname), connector, outgoingMessages, coroutineContext)
-        }
     }
 
     private val resolver = dnsResolver()
-    private val coroutineScope = CoroutineScope(coroutineContext + SupervisorJob() + CoroutineName("TRANSFER-AGENT"))
+    private val coroutineScope = CoroutineScope(coroutineContext + Job() + CoroutineName("transfer-agent"))
 
     init {
-        println("TRANSFER: WAITING ON QUEUE")
-        outgoingMessages.onEach { coroutineScope.launch { transfer(it) } }.launchIn(coroutineScope)
+        coroutineScope.launch {
+            outgoingMessages.collect {
+                launch {
+                    transfer(it)
+                }
+            }
+        }
     }
 
     private data class TransferSession(
@@ -62,12 +64,8 @@ class TransferAgent private constructor(
             writer = connection.writer.asAsyncSmtpClientWriter()
         }
 
-        fun println(content: String) {
-            kotlin.io.println("TRANSFER ($id/$exchange): $content")
-        }
-
         suspend inline fun <reified T : SmtpCommand> send(command: T) {
-            kotlin.io.println("TRANSFER ($id/$exchange) >>> $command")
+            logger.trace { "TRANSFER ($id/$exchange) >>> $command" }
 
             writer.writeCommand(command)
         }
@@ -75,11 +73,11 @@ class TransferAgent private constructor(
         suspend inline fun <reified C: SmtpReply<C>, reified T: C> recv(): SmtpReply<*> {
             var reply = reader.readSmtpReply()
 
+            logger.trace { "TRANSFER ($id/$exchange) <<< $reply" }
+
             if (reply is C) {
                 reply = reply.tryAs<C, T>() as SmtpReply<*>
             }
-
-            kotlin.io.println("TRANSFER ($id/$exchange) <<< $reply")
 
             return reply
         }
@@ -91,46 +89,45 @@ class TransferAgent private constructor(
                 (reply.tryAs<C, T>() as? SmtpReply<*>)?.let { reply = it }
             }
 
-            kotlin.io.println("TRANSFER ($id/$exchange) <<< $reply")
+            logger.trace { "TRANSFER ($id/$exchange) <<< $reply" }
 
             return reply.coerceToStepProgression()
         }
     }
 
-    // TODO: error handling. e.g. incorrect host/message recipient syntax
     private suspend fun transfer(mail: InternetMessage) {
-        val session = TransferSession(mail.queueId, null)
+        logger.info("Beginning transfer of the message ${mail.queueId}.")
 
-        with (session) {
-            println("MESSAGE (${mail.queueId}) READY FOR TRANSFER")
-
-            mail.envelope.recipientAddresses.forEach { mail.sendTo(it) }
+        mail.envelope.recipientAddresses.forEach {
+            logger.info("Beginning transfer of the message ${mail.queueId} to ${it}.")
+            mail.sendTo(it)
         }
+
+        logger.info("Finished transfer of the message ${mail.queueId}.")
     }
 
-    private suspend fun InternetMessage.sendTo(rcpt: String) = with(TransferSession(queueId, null)) {
-        val host = rcpt.split('@')[1].removeSuffix(">")
-
-        println("RESOLVING HOST $host")
-
-        val response = resolver.resolveRecursively(host, GOOGLE_DNS) {
-            qType = ResourceType.MX
+    private suspend fun InternetMessage.sendTo(rcpt: Path) = with(TransferSession(queueId, null)) {
+        val host = when (val domain = rcpt.mailbox.domain) {
+            is Domain.Actual -> domain.domain
+            is Domain.AddressLiteral -> domain.networkAddress.toString()
         }
 
-        println("RESOLVED ${response.orEmpty().size} MX RECORDS")
-        println(response.toString())
+        logger.debug { "Attempting to resolve MX records for $host." }
 
-        response.orEmpty()
-            .filterIsInstance<MXResourceRecord>()
+        val mxRecords = resolver.resolveRecursively(host, GOOGLE_DNS) {
+            qType = ResourceType.MX
+        }?.filterIsInstance<MXResourceRecord>().orEmpty()
+
+        logger.debug { "Resolved ${mxRecords.size} MX records.${mxRecords.joinToString(prefix = "\n", separator = "\n")}" }
+
+        mxRecords
             .sortedBy { it.data.preference }
             .firstNotNullOfOrNull { connector.connect(it.data.exchange)?.run { it.data.exchange to this } }
             ?.let { (exchange, connection) ->
                 this.exchange = exchange
                 this.connection = connection
+                updateChannels()
             } ?: TODO("could not connect to any exchange servers")
-
-        connection = connector.connect(exchange!!) ?: error("no mx records work")
-        updateChannels()
 
         var isEncrypted = false
 
@@ -140,29 +137,34 @@ class TransferAgent private constructor(
             }
 
             step {
-                send(EhloCommand(data.host))
+                send(EhloCommand(config.host))
 
                 val ehlo = recv<SmtpReply.PositiveCompletion, EhloCompletion>()
 
-                if (ehlo !is EhloCompletion) return@step StepProgression.Abort("EXPECTED EHLO REPLY. GOT: $ehlo")
+                if (ehlo !is EhloCompletion) return@step StepProgression.Abort("Expected an EHLO reply, got $ehlo instead.")
 
-                if (connection.isImplicitlyEncrypted) return@step StepProgression.Continue
+                // negotiate TLS
+                if (connection.isImplicitlyEncrypted || isEncrypted) return@step StepProgression.Continue
 
-                if (isEncrypted || !ehlo.capabilities.containsKey(STARTTLS)) return@step StepProgression.Continue
+                if (!ehlo.capabilities.containsKey(STARTTLS) || !connection.supportsClientTls) {
+                    if (config.requireEncryption) return@step StepProgression.Abort("Encryption is required however encryption could not be negotiated.")
+                    else logger.debug { "Continuing the transfer of $queueId without any encryption!" }
+                    return@step StepProgression.Continue
+                }
 
                 send(StartTlsCommand)
 
                 when (val resp = recv<SmtpReply.PositiveCompletion, ReadyToStartTlsCompletion>()) {
-                    is SmtpReply.PermanentNegative -> return@step StepProgression.Abort("RECEIVED NO TO STARTTLS: $resp")
+                    is SmtpReply.PermanentNegative -> return@step StepProgression.Abort("STARTTLS was denied by the server!")
                     is SmtpReply.TransientNegative -> TODO("figure out what we should do")
                     else -> {}
                 }
 
+                logger.debug { "Starting TLS negotiations." }
                 connection.upgradeToTls()
                 isEncrypted = true
                 updateChannels()
-
-                println("SUCCESSFULLY UPGRADED TO TLS")
+                logger.debug { "Upgraded connection to TLS."}
 
                 StepProgression.Retry
             }
@@ -189,7 +191,11 @@ class TransferAgent private constructor(
             }
 
             stop {
-                if (it is StopReason.Abrupt) println("STOPPING TRANSFER SESSION DUE TO: ${it.reason}")
+                if (it is StopReason.Abrupt) {
+                    logger.warn { "The transfer of $queueId to $rcpt was abruptly stopped because of: ${it.reason}" }
+                } else {
+                    logger.info { "The transfer of $queueId to $rcpt was successful." }
+                }
 
                 send(QuitCommand)
 

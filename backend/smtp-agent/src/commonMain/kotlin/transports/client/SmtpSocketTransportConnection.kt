@@ -11,6 +11,9 @@ class SmtpSocketTransportConnection(private var socket: Socket, override val isI
     SmtpTransportConnection {
     override val remote: String = socket.remoteAddress.toString()
 
+    override val supportsClientTls: Boolean = true
+    override val supportsServerTls: Boolean = false
+
     private var _readChannel: ByteReadChannel = socket.openReadChannel()
         set(value) {
             field = value

@@ -6,6 +6,9 @@ import dev.sitar.kmail.smtp.io.AsyncWriterStream
 interface SmtpTransportConnection {
     val remote: String
 
+    val supportsClientTls: Boolean
+    val supportsServerTls: Boolean
+
     val isImplicitlyEncrypted: Boolean
         get() = false
 
