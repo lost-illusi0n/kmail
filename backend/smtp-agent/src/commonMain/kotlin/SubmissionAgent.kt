@@ -1,27 +1,27 @@
 package dev.sitar.kmail.smtp.agent
 
 import dev.sitar.kmail.message.Message
+import dev.sitar.kmail.message.headers.Headers
+import dev.sitar.kmail.message.headers.messageId
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.agent.transports.client.SmtpTransportConnection
-import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
 import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportConnection
 import dev.sitar.kmail.smtp.frames.replies.*
 import dev.sitar.kmail.smtp.io.smtp.reader.asAsyncSmtpServerReader
 import dev.sitar.kmail.smtp.io.smtp.writer.asAsyncSmtpServerWriter
+import io.ktor.util.date.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.*
 import mu.KotlinLogging
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.coroutineContext
 
 private val logger = KotlinLogging.logger { }
 
 data class SubmissionConfig(
-    val host: String,
+    val domain: Domain,
     val requiresEncryption: Boolean
 )
 
@@ -33,8 +33,12 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
 ) {
     private val scope = CoroutineScope(coroutineContext + Job() + CoroutineName("submission-agent"))
 
-    private val _incomingMail: Channel<InternetMessage> = Channel()
-    val incomingMail: ReceiveChannel<InternetMessage> = _incomingMail
+    private val rawMail: Channel<InternetMessage> = Channel()
+
+    val incomingMail: SharedFlow<InternetMessage> = rawMail
+        .consumeAsFlow()
+        .map { InternetMessage(it.envelope, validateMail(it.message)) }
+        .shareIn(scope, SharingStarted.Eagerly)
 
     fun launch() {
         scope.launch {
@@ -136,16 +140,16 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
                         recvExpected<EhloCommand>() ?: break
 
                         val capabilities: Map<EhloKeyword, EhloParam> = buildMap {
-                            if (!transport.isImplicitlyEncrypted && !isUpgraded && transport.supportsServerTls) {
+                            if ((!transport.isImplicitlyEncrypted || !isUpgraded) && transport.supportsServerTls) {
                                 put("STARTTLS", null)
+                                if (!isAuthenticated) put("AUTH", "PLAIN")
                             } else if (config.requiresEncryption) {
                                 logger.error("Server requires encryption but it cannot provide it!")
                                 TODO("handle no encryption.")
                             }
-                            else if (!isAuthenticated) put("AUTH", "PLAIN")
                         }
 
-                        send(EhloCompletion(config.host, "Hello, I am Kmail!", capabilities))
+                        send(EhloCompletion(config.domain, "Hello, I am Kmail!", capabilities))
                         state = State.Initiated
                     }
 
@@ -232,7 +236,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
                         logger.info("Submission has received email as ${message.queueId}.\n{}", message)
                         send(OkCompletion("Queued as ${message.queueId}"))
 
-                        _incomingMail.send(message)
+                        rawMail.send(message)
 
                         state = State.Authorized
                     }
@@ -249,4 +253,14 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
         serverTransport.close()
         scope.cancel()
     }
+}
+
+private fun SubmissionAgent<*>.validateMail(mail: Message): Message {
+    val headers = mail.headers.toMutableSet()
+
+    if (Headers.MessageId !in mail.headers) {
+        headers += messageId("<${getTimeMillis()}@${config.domain.asString()}>")
+    }
+
+    return Message(Headers(headers), mail.body)
 }

@@ -5,7 +5,7 @@ import kotlin.math.absoluteValue
 import kotlin.math.sign
 
 fun originalDate(date: Instant, zone: UtcOffset): Header {
-    return Header("Date", date.format(zone))
+    return Header(Headers.OriginalDate, date.format(zone))
 }
 
 private fun Instant.format(offset: UtcOffset): String {

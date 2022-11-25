@@ -7,7 +7,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.UtcOffset
 
 data class Message(
-    val headers: Set<Header>,
+    val headers: Headers,
     val body: String?
 ) {
     companion object {
@@ -31,7 +31,7 @@ data class Message(
                 }
             }
 
-            return Message(headers, body)
+            return Message(Headers(headers), body)
         }
     }
 
@@ -83,7 +83,7 @@ class MessageBuilder {
     }
 
     fun build(): Message {
-        return Message(headers.toSet(), body)
+        return Message(Headers(headers.toSet()), body)
     }
 }
 

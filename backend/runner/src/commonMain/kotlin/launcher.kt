@@ -1,7 +1,6 @@
 package dev.sitar.kmail.runner
 
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.job
 import mu.KotlinLogging
 
@@ -12,7 +11,7 @@ suspend fun run() = coroutineScope {
     logger.info("Kmail is starting.")
 
     val submissionAgent = submission()
-    val transferAgent = transfer(submissionAgent.incomingMail.consumeAsFlow())
+    val transferAgent = transfer(submissionAgent.incomingMail)
 
     coroutineContext.job.join()
 }

@@ -55,18 +55,17 @@ public data class HeloCommand(val domain: String) : SmtpCommand {
     }
 }
 
-public data class EhloCommand(val data: String) : SmtpCommand {
+public data class EhloCommand(val domain: Domain) : SmtpCommand {
     override val tag: SmtpCommandTag = SmtpCommandTag.Ehlo
 
     public object Serializer : SmtpCommandSerializer<EhloCommand> {
         public override suspend fun serialize(command: EhloCommand, output: AsyncSmtpWriter) {
-            output.writeIsFinal()
-            output.writeStringUtf8(command.data)
+            output.writeStringUtf8(command.domain.asString())
             output.endLine()
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): EhloCommand {
-            return EhloCommand(input.readUtf8UntilSmtpEnding())
+            return EhloCommand(Domain.fromText(input.readUtf8UntilSmtpEnding())!!)
         }
     }
 }

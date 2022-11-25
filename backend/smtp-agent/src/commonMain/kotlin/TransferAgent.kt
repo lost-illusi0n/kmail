@@ -23,7 +23,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 private val logger = KotlinLogging.logger { }
 
 data class TransferConfig(
-    val host: String,
+    val domain: Domain,
     val requireEncryption: Boolean,
 )
 
@@ -137,7 +137,7 @@ class TransferAgent(
             }
 
             step {
-                send(EhloCommand(config.host))
+                send(EhloCommand(config.domain))
 
                 val ehlo = recv<SmtpReply.PositiveCompletion, EhloCompletion>()
 

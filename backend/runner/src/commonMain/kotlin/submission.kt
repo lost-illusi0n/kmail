@@ -16,7 +16,7 @@ suspend fun submission() = coroutineScope {
     logger.info("SMTP submission agent is starting.")
 
     val agent = SubmissionAgent(
-        SubmissionConfig(CONFIGURATION.domain),
+        SubmissionConfig(CONFIGURATION.domain, requiresEncryption = true),
         tlsServerSocketClient().bind(),
         KmailAuthenticationManager,
         coroutineContext

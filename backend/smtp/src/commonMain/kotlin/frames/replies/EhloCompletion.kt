@@ -1,5 +1,6 @@
 package dev.sitar.kmail.smtp.frames.replies
 
+import dev.sitar.kmail.smtp.Domain
 import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpServerWriter
 import dev.sitar.kmail.smtp.io.writeStringUtf8
 
@@ -10,13 +11,13 @@ public typealias EhloParam = String?
 public const val STARTTLS: EhloKeyword = "STARTTLS"
 
 public data class EhloCompletion(
-    val domain: String,
+    val domain: Domain,
     val greet: String?,
     val capabilities: Map<EhloKeyword, EhloParam>
 ) :
     SmtpReply.PositiveCompletion by SmtpReply.PositiveCompletion.Default(
         code = 250,
-        lines = listOf("$domain${greet?.let { " $it" }}") + capabilities.map { (key, param) -> "$key${param?.let { " $it" } ?: ""}" }
+        lines = listOf("${domain.asString()}${greet?.let { " $it" }}") + capabilities.map { (key, param) -> "$key${param?.let { " $it" } ?: ""}" }
     ) {
     public companion object {
         public fun from(lines: List<String>): EhloCompletion {
@@ -47,28 +48,7 @@ public data class EhloCompletion(
                 }
             }
 
-            return EhloCompletion(domain, greet, capabilities)
-        }
-
-        public suspend fun serialize(output: AsyncSmtpServerWriter, ehlo: EhloCompletion) {
-            output.writeIsFinal(ehlo.capabilities.isEmpty())
-
-            output.writeStringUtf8(ehlo.domain)
-
-            if (ehlo.greet != null) output.writeStringUtf8(" ${ehlo.greet}")
-
-            output.endLine()
-
-            ehlo.capabilities.onEachIndexed { i, (keyword, param) ->
-                output.writeStatusCode(ehlo.code)
-                output.writeIsFinal(i == ehlo.capabilities.size - 1)
-
-                output.writeStringUtf8(keyword)
-
-                if (param != null) output.writeStringUtf8(" $param")
-
-                output.endLine()
-            }
+            return EhloCompletion(Domain.fromText(domain)!!, greet, capabilities)
         }
     }
 }
