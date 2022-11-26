@@ -1,4 +1,4 @@
-package dev.sitar.kmail.smtp.io
+package dev.sitar.kmail.utils.io
 
 import dev.sitar.kio.async.writers.AsyncWriter
 

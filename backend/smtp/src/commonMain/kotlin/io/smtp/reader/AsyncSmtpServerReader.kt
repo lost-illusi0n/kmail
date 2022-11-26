@@ -6,7 +6,7 @@ import dev.sitar.kio.fullSlice
 import dev.sitar.kio.use
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
-import dev.sitar.kmail.smtp.io.readUtf8StringUntil
+import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import kotlin.math.max
 
 public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, AsyncReader by reader {

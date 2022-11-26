@@ -5,17 +5,15 @@ import dev.sitar.kio.async.readers.AsyncReader
 import dev.sitar.kio.async.readers.toAsyncReader
 import dev.sitar.kmail.smtp.agent.io.OutputStreamAsyncWriterStream
 import dev.sitar.kmail.smtp.agent.io.toAsyncWriterStream
-import dev.sitar.kmail.smtp.io.AsyncWriterStream
+import dev.sitar.kmail.utils.io.AsyncWriterStream
 import io.ktor.util.network.*
 import io.ktor.utils.io.*
 import io.ktor.utils.io.jvm.javaio.*
 import io.ktor.utils.io.pool.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.CancellationException
 import java.net.Socket
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
-import kotlin.coroutines.EmptyCoroutineContext
 
 actual typealias TlsCapableSocket = Socket
 

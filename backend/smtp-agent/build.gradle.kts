@@ -12,6 +12,7 @@ kotlin {
 
     sourceSets["commonMain"].dependencies {
         api(project(":smtp"))
+        implementation(project(":utils"))
         implementation("io.github.microutils:kotlin-logging:3.0.2")
 
         implementation("dev.sitar:kio:1.1.0")

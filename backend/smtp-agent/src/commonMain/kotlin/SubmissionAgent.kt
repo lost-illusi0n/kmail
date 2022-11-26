@@ -25,10 +25,10 @@ data class SubmissionConfig(
     val requiresEncryption: Boolean
 )
 
-class SubmissionAgent<User : SmtpAuthenticatedUser>(
+class SubmissionAgent(
     val config: SubmissionConfig,
     val serverTransport: SmtpServerTransportConnection,
-    val authenticationManager: SubmissionAuthenticationManager<User>,
+    val authenticationManager: SubmissionAuthenticationManager<*>?,
     coroutineContext: CoroutineContext = EmptyCoroutineContext
 ) {
     private val scope = CoroutineScope(coroutineContext + Job() + CoroutineName("submission-agent"))
@@ -122,11 +122,10 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
 
         var state: State = State.Established
 
-        // TODO: make isUpgraded part of the transport?
-        var isUpgraded = false
+        var isUpgraded = transport.isImplicitlyEncrypted
 
         var isAuthenticated = false
-        var authenticatedUser: User? = null
+        var authenticatedUser: SmtpAuthenticatedUser? = null
 
         with(session) {
             while (true) {
@@ -140,9 +139,10 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
                         recvExpected<EhloCommand>() ?: break
 
                         val capabilities: Map<EhloKeyword, EhloParam> = buildMap {
-                            if ((!transport.isImplicitlyEncrypted || !isUpgraded) && transport.supportsServerTls) {
-                                put("STARTTLS", null)
+                            if (isUpgraded) {
                                 if (!isAuthenticated) put("AUTH", "PLAIN")
+                            } else if (transport.supportsServerTls) {
+                                put("STARTTLS", null)
                             } else if (config.requiresEncryption) {
                                 logger.error("Server requires encryption but it cannot provide it!")
                                 TODO("handle no encryption.")
@@ -200,7 +200,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
                     State.Authorized -> {
                         val mail = recvExpected<MailCommand>() ?: break
 
-                        val canSend = authenticatedUser?.let { authenticationManager?.canSend(it, mail.from) } ?: true
+                        val canSend = authenticatedUser?.let { (authenticationManager as? SubmissionAuthenticationManager<SmtpAuthenticatedUser>)?.canSend(it, mail.from) } ?: true
 
                         if (!canSend) todo("authenticated user is not authorized to send as ${mail.from}")
 
@@ -255,7 +255,7 @@ class SubmissionAgent<User : SmtpAuthenticatedUser>(
     }
 }
 
-private fun SubmissionAgent<*>.validateMail(mail: Message): Message {
+private fun SubmissionAgent.validateMail(mail: Message): Message {
     val headers = mail.headers.toMutableSet()
 
     if (Headers.MessageId !in mail.headers) {

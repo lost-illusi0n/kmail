@@ -2,8 +2,9 @@ package dev.sitar.kmail.smtp.io.smtp.writer
 
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
-import dev.sitar.kmail.smtp.io.AsyncWriterStream
-import dev.sitar.kmail.smtp.io.writeStringUtf8
+import dev.sitar.kmail.utils.io.AsyncWriterStream
+import dev.sitar.kmail.utils.io.writeLineEnd
+import dev.sitar.kmail.utils.io.writeStringUtf8
 import io.ktor.utils.io.*
 
 public class AsyncSmtpClientWriter(writer: AsyncWriterStream) : AsyncSmtpWriter, AsyncWriterStream by writer {
@@ -24,7 +25,7 @@ public class AsyncSmtpClientWriter(writer: AsyncWriterStream) : AsyncSmtpWriter,
     public suspend fun writeMessageData(message: Message) {
         writeStringUtf8(message.asText())
         write('.'.code.toByte())
-        endLine()
+        writeLineEnd()
 
         flush()
     }

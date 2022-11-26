@@ -1,11 +1,9 @@
 package dev.sitar.kmail.smtp.io.smtp.reader
 
 import dev.sitar.kio.async.readers.AsyncReader
-import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.frames.replies.SmtpReply
-import dev.sitar.kmail.smtp.frames.replies.tryAs
-import dev.sitar.kmail.smtp.io.readStringUtf8
-import dev.sitar.kmail.smtp.io.readUtf8StringUntil
+import dev.sitar.kmail.utils.io.readStringUtf8
+import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
 
 public class AsyncSmtpClientReader(reader: AsyncReader) : AsyncSmtpReader, AsyncReader by reader {
     public suspend fun readSmtpCode(): Int {
@@ -34,7 +32,7 @@ public class AsyncSmtpClientReader(reader: AsyncReader) : AsyncSmtpReader, Async
             do {
                 val code = readSmtpCode()
                 isFinal = readIsFinal()
-                add(code to readUtf8UntilSmtpEnding())
+                add(code to readUtf8UntilLineEnd())
             } while (!isFinal)
         }
     }

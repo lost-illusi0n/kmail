@@ -4,7 +4,7 @@ import dev.sitar.kio.Pool
 import dev.sitar.kio.Slice
 import dev.sitar.kio.buffers.Buffer
 import dev.sitar.kio.buffers.DefaultBufferPool
-import dev.sitar.kmail.smtp.io.AsyncWriterStream
+import dev.sitar.kmail.utils.io.AsyncWriterStream
 import java.io.OutputStream
 
 class OutputStreamAsyncWriterStream(val outputStream: OutputStream) : AsyncWriterStream {

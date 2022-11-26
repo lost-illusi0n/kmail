@@ -1,7 +1,7 @@
 package dev.sitar.kmail.smtp.agent.transports.client
 
 import dev.sitar.kio.async.readers.AsyncReader
-import dev.sitar.kmail.smtp.io.AsyncWriterStream
+import dev.sitar.kmail.utils.io.AsyncWriterStream
 
 interface SmtpTransportConnection {
     val remote: String

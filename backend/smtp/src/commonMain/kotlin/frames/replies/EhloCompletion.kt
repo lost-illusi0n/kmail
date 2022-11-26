@@ -1,8 +1,6 @@
 package dev.sitar.kmail.smtp.frames.replies
 
 import dev.sitar.kmail.smtp.Domain
-import dev.sitar.kmail.smtp.io.smtp.writer.AsyncSmtpServerWriter
-import dev.sitar.kmail.smtp.io.writeStringUtf8
 
 public typealias EhloKeyword = String
 
