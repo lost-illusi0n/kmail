@@ -7,17 +7,18 @@ import dev.sitar.kmail.smtp.agent.SmtpAuthenticatedUser
 import dev.sitar.kmail.smtp.agent.SubmissionAgent
 import dev.sitar.kmail.smtp.agent.SubmissionAuthenticationManager
 import dev.sitar.kmail.smtp.agent.SubmissionConfig
+import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
 import kotlinx.coroutines.coroutineScope
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun submission() = coroutineScope {
+suspend fun submission(client: SmtpServerTransportClient) = coroutineScope {
     logger.info("SMTP submission agent is starting.")
 
     val agent = SubmissionAgent(
         SubmissionConfig(CONFIGURATION.domain, requiresEncryption = true),
-        tlsServerSocketClient().bind(),
+        client.bind(),
         KmailAuthenticationManager,
         coroutineContext
     )

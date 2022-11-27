@@ -6,6 +6,7 @@ include("smtp")
 include("message-format")
 
 include("smtp-agent")
+include("imap-agent")
 
 include("runner")
 

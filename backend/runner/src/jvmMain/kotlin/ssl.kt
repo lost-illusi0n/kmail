@@ -11,7 +11,7 @@ import javax.net.ssl.TrustManagerFactory
 
 private val logger = KotlinLogging.logger { }
 
-actual fun tlsServerSocketClient(): TlsCapableSmtpSubmissionServerTransportClient {
+fun ssl(): SSLContext {
     val ssl = SSLContext.getInstance("TLS")
 
     val keyStore = if (File("./certs/root.keystore").exists()) {
@@ -41,5 +41,5 @@ actual fun tlsServerSocketClient(): TlsCapableSmtpSubmissionServerTransportClien
 
     logger.debug { "Generated SSL context." }
 
-    return TlsCapableSmtpSubmissionServerTransportClient(ssl)
+    return ssl
 }
