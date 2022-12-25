@@ -15,7 +15,8 @@ sealed interface ImapCommand {
         Login(LoginCommand),
         List(ListCommand),
         Lsub(ListSubscriptionsCommand),
-        Fetch(FetchCommand);
+        Fetch(FetchCommand),
+        Create(CreateCommand);
 
         companion object {
             fun findByIdentifier(identifier: String) : Identifier? {

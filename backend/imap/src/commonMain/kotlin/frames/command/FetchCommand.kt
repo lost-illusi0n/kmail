@@ -1,22 +1,44 @@
 package dev.sitar.kmail.imap.frames.command
 
 import dev.sitar.kio.async.readers.AsyncReader
-import dev.sitar.kmail.imap.SequenceSet
+import dev.sitar.kmail.imap.Sequence
+import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.imap.readList
+import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
 
-data class FetchCommand(val sequenceSet: SequenceSet, val dataItems: List<String>) : ImapCommand {
+data class FetchCommand(val sequence: Sequence, val dataItems: List<DataItem.Fetch>) : ImapCommand {
     override val identifier: ImapCommand.Identifier = ImapCommand.Identifier.Fetch
 
     companion object : ImapCommandSerializer<FetchCommand> {
-        suspend fun deserialize(mode: SequenceSet.Mode, input: AsyncReader): FetchCommand {
-            val sequence = SequenceSet.deserialize(mode, input)
-            val dataItems = input.readList()
-            input.readUtf8UntilLineEnd()
-            return FetchCommand(sequence, dataItems)
+        suspend fun deserialize(mode: Sequence.Mode, input: AsyncReader): FetchCommand {
+            val sequence = Sequence.deserialize(mode, input)
+
+            if (input.read() != '('.code.toByte()) TODO("syntax error")
+
+            val items = buildList {
+                var isFinal = false
+
+                while (!isFinal) {
+                    val identifier = input.readUtf8StringUntil {
+                        isFinal = it == ')'
+                        isFinal || it == ' ' || it == '['
+                    }
+
+                    if (identifier == "") break
+
+                    val typed = DataItem.Identifier.from(identifier) ?: TODO("unknown data item: $identifier")
+
+                    add(typed.fetchSerializer.deserialize(input))
+                }
+            }
+
+            if (input.readUtf8UntilLineEnd() != "") TODO("syntax error")
+
+            return FetchCommand(sequence, items)
         }
 
         override suspend fun deserialize(input: AsyncReader): FetchCommand =
-            deserialize(mode = SequenceSet.Mode.SequenceNumber, input)
+            deserialize(mode = Sequence.Mode.SequenceNumber, input)
     }
 }

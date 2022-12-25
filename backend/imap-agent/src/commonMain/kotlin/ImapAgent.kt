@@ -23,7 +23,7 @@ class ImapAgent(
     private val scope = CoroutineScope(CoroutineName("imap-agent") + Job() + coroutineContext)
 
     init {
-        scope.launch { handle() }
+        scope.launch { try { handle() } catch (e: Exception) { logger.info("handled for a session stopped with an exception.", e) } }
     }
 
     private val capabilities: List<String>
@@ -78,14 +78,18 @@ class ImapAgent(
     private suspend fun authenticated() {
         val taggedCommand = transport.recv()
 
+        val tag = taggedCommand.tag
+
         when (val command = taggedCommand.command) {
             is SelectCommand -> {
-                transport.send(Tag.Untagged + FlagsResponse(flags = FlagsResponse.SYSTEM_FLAGS + "Sent"))
-                transport.send(Tag.Untagged + ExistsResponse(n = 2))
-                transport.send(Tag.Untagged + RecentResponse(n = 3))
-                transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY 1]"))
-                transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT 1]"))
-                transport.send(taggedCommand.tag + OkResponse(text = "SELECT complete."))
+                val selectedMailbox = queryAgent.select(command.mailboxName)
+
+                transport.send(Tag.Untagged + FlagsResponse(flags = selectedMailbox.flags))
+                transport.send(Tag.Untagged + ExistsResponse(n = selectedMailbox.exists))
+                transport.send(Tag.Untagged + RecentResponse(n = selectedMailbox.recent))
+                transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${selectedMailbox.uidValidity}]")) // TODO: this is a response code
+                transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${selectedMailbox.uidNext}]")) // TODO: this is a response code
+                transport.send(tag + OkResponse(text = "[READ-WRITE] SELECT complete."))
 
                 mailbox = command.mailboxName
                 state = ImapState.Selected
@@ -96,7 +100,7 @@ class ImapAgent(
                     transport.send(Tag.Untagged + ListResponse(it.attributes, ImapFolder.DELIM, it.name))
                 }
 
-                transport.send(taggedCommand.tag + OkResponse(text = "Here are your folders."))
+                transport.send(tag + OkResponse(text = "Here are your folders."))
             }
 
             is ListSubscriptionsCommand -> {
@@ -104,7 +108,14 @@ class ImapAgent(
                     transport.send(Tag.Untagged + ListSubscriptionsResponse(it.attributes, ImapFolder.DELIM, it.name))
                 }
 
-                transport.send(taggedCommand.tag + OkResponse(text = "Here are your subscribed folders."))
+                transport.send(tag + OkResponse(text = "Here are your subscribed folders."))
+            }
+
+            is CreateCommand -> {
+                // TODO: check the result of this call
+                queryAgent.create(command.mailboxName)
+
+                transport.send(tag + OkResponse(text = "Created a new mailbox."))
             }
 
             else -> universalHandler(taggedCommand)
@@ -129,8 +140,9 @@ class ImapAgent(
     }
 
     private suspend fun fetch(tag: Tag, command: FetchCommand) {
-        queryAgent.fetch(mailbox!!, command.sequenceSet, command.dataItems).forEach {
-            transport.send(Tag.Untagged + FetchResponse(it))
+        queryAgent.fetch(mailbox!!, command.sequence, command.dataItems).forEach { (id, items) ->
+            println("got response $id $items")
+            transport.send(Tag.Untagged + FetchResponse(id, items))
         }
 
         transport.send(tag + OkResponse(text = "Here is your mail."))
