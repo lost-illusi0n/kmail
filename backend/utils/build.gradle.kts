@@ -10,7 +10,11 @@ kotlin {
     jvm()
 
     sourceSets["commonMain"].dependencies {
-        api("dev.sitar:kio:1.1.0")
-        api("io.ktor:ktor-io:2.1.3")
+        implementation("io.github.microutils:kotlin-logging:3.0.2")
+
+        api("dev.sitar:kio:1.1.1")
+        api("io.ktor:ktor-io:2.2.4")
+        api("io.ktor:ktor-network:2.1.3")
+        api("io.ktor:ktor-network-tls:2.1.3")
     }
 }

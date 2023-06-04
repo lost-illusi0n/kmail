@@ -51,17 +51,17 @@ public sealed interface Domain {
 
     public companion object {
         public fun fromText(text: String): Domain? {
-            if (text.startsWith('[') && text.startsWith(']')) {
+            if (text.startsWith('[') && text.endsWith(']')) {
                 val addressLiteral = text.substring(1, text.length - 1)
 
                 // TODO: support ivp6
                 val data = addressLiteral
                     .split('.')
                     .takeIf { it.size == 4 }
-                    ?.map { it.toByte() }
-                    ?.toByteArray() ?: return null
+                    ?.map { it.toUByte() }
+                    ?.toUByteArray() ?: return null
 
-                return AddressLiteral(NetworkAddress.Ipv4Address(data.fullSlice()))
+                return AddressLiteral(NetworkAddress.Ipv4Address(data.asByteArray().fullSlice()))
             }
 
             return Actual(text)

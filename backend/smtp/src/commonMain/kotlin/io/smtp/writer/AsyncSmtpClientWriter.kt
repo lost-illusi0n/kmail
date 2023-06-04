@@ -1,6 +1,6 @@
 package dev.sitar.kmail.smtp.io.smtp.writer
 
-import dev.sitar.kmail.smtp.frames.replies.*
+import dev.sitar.kmail.smtp.frames.replies.SmtpReply
 import dev.sitar.kmail.utils.io.AsyncWriterStream
 import dev.sitar.kmail.utils.io.writeLineEnd
 import dev.sitar.kmail.utils.io.writeStringUtf8

@@ -1,10 +1,8 @@
 package dev.sitar.kmail.message
 
-import dev.sitar.kio.buffers.SequentialReader
 import dev.sitar.kio.buffers.asBuffer
-import dev.sitar.kmail.message.headers.*
-import kotlinx.datetime.Clock
-import kotlinx.datetime.UtcOffset
+import dev.sitar.kmail.message.headers.Header
+import dev.sitar.kmail.message.headers.Headers
 
 data class Message(
     val headers: Headers,

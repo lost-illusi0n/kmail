@@ -1,12 +1,9 @@
 package dev.sitar.kmail.imap.frames
 
 import dev.sitar.kio.async.readers.AsyncReader
-import dev.sitar.kio.async.readers.toAsyncReader
 import dev.sitar.kio.async.writers.AsyncWriter
 import dev.sitar.kio.async.writers.toAsyncWriter
 import dev.sitar.kio.buffers.DefaultBufferPool
-import dev.sitar.kio.buffers.asBuffer
-import dev.sitar.kio.buffers.buffer
 import dev.sitar.kio.use
 import dev.sitar.kmail.imap.PartSpecifier
 import dev.sitar.kmail.utils.io.readUtf8StringUntil

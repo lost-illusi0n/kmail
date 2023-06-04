@@ -1,1 +1,0 @@
-package dev.sitar.kmail.imap

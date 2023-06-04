@@ -1,6 +1,5 @@
 package dev.sitar.kmail.runner
 
-import dev.sitar.kmail.smtp.agent.transports.server.TlsCapableSmtpSubmissionServerTransportClient
 import io.ktor.network.tls.certificates.*
 import mu.KotlinLogging
 import java.io.File
@@ -30,9 +29,8 @@ fun ssl(): SSLContext {
         keyStore
     }
 
-
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
-    keyManagerFactory.init(keyStore, CONFIGURATION.keystorePassword!!.toCharArray())
+    keyManagerFactory.init(keyStore, CONFIGURATION.keystorePassword.toCharArray())
 
     val trustManagerFactory = TrustManagerFactory.getInstance("SunX509")
     trustManagerFactory.init(keyStore)

@@ -44,7 +44,7 @@ actual class TlsCapableImapTransport(
     }
 
     override suspend fun recv(): TaggedImapCommand {
-        val command = reader.readCommand()!!
+        val command = reader.readCommand()
         logger.trace { "IMAP($remote) <<< $command" }
         return command
     }

@@ -6,7 +6,7 @@ import dev.sitar.kio.buffers.Buffer
 import dev.sitar.kio.buffers.DefaultBufferPool
 import io.ktor.utils.io.*
 
-public class ByteWriteChannelAsyncWriterStream(public val channel: ByteWriteChannel) : AsyncWriterStream {
+class ByteWriteChannelAsyncWriterStream(val channel: ByteWriteChannel) : AsyncWriterStream {
     override val bufferPool: Pool<Buffer>
         get() = DefaultBufferPool
 
@@ -24,6 +24,6 @@ public class ByteWriteChannelAsyncWriterStream(public val channel: ByteWriteChan
     }
 }
 
-public fun ByteWriteChannel.toAsyncWriterStream(): ByteWriteChannelAsyncWriterStream {
+fun ByteWriteChannel.toAsyncWriterStream(): ByteWriteChannelAsyncWriterStream {
     return ByteWriteChannelAsyncWriterStream(this)
 }

@@ -1,6 +1,5 @@
 package dev.sitar.kmail.smtp.frames.replies
 
-import dev.sitar.kmail.smtp.io.smtp.reader.AsyncSmtpReader
 import kotlin.reflect.KClass
 
 

@@ -7,7 +7,7 @@ import dev.sitar.kio.buffers.DefaultBufferPool
 import io.ktor.utils.io.*
 import io.ktor.utils.io.bits.*
 
-public class AsyncByteReadChannelReader(private val channel: ByteReadChannel) : AsyncReader {
+class AsyncByteReadChannelReader(private val channel: ByteReadChannel) : AsyncReader {
     override val bufferPool: Pool<Buffer> = DefaultBufferPool
     override val openForRead: Boolean get() = !channel.isClosedForRead
 
@@ -29,6 +29,6 @@ public class AsyncByteReadChannelReader(private val channel: ByteReadChannel) : 
     }
 }
 
-public fun ByteReadChannel.toAsyncReader(): AsyncByteReadChannelReader {
+fun ByteReadChannel.toAsyncReader(): AsyncByteReadChannelReader {
     return AsyncByteReadChannelReader(this)
 }

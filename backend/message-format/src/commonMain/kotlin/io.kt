@@ -1,6 +1,5 @@
 package dev.sitar.kmail.message
 
-import dev.sitar.kio.async.writers.AsyncWriter
 import dev.sitar.kio.buffers.Buffer
 import dev.sitar.kio.buffers.SequentialReader
 import dev.sitar.kio.buffers.buffer

@@ -1,12 +1,14 @@
 
 rootProject.name = "kmail"
 
+include("pop3")
 include("imap")
 include("smtp")
 include("message-format")
 
-include("smtp-agent")
+include("pop3-agent")
 include("imap-agent")
+include("smtp-agent")
 
 include("runner")
 
@@ -22,7 +24,14 @@ includeBuild("../../dnskotlin") {
 // TODO: publish latest kio
 includeBuild("../../kio") {
     dependencySubstitution {
-        substitute(module("dev.sitar:kio")).using(project(":"))
+        substitute(module("dev.sitar:kio:1.1.1")).using(project(":"))
+    }
+}
+
+// TODO: publish keystone
+includeBuild("../../keystone") {
+    dependencySubstitution {
+        substitute(module("dev.sitar:keystone")).using(project(":"))
     }
 }
 

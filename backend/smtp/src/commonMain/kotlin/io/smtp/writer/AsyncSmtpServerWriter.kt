@@ -1,11 +1,11 @@
 package dev.sitar.kmail.smtp.io.smtp.writer
 
 import dev.sitar.kmail.message.Message
-import dev.sitar.kmail.smtp.*
+import dev.sitar.kmail.smtp.SmtpCommand
+import dev.sitar.kmail.smtp.SmtpCommandSerializer
 import dev.sitar.kmail.utils.io.AsyncWriterStream
 import dev.sitar.kmail.utils.io.writeLineEnd
 import dev.sitar.kmail.utils.io.writeStringUtf8
-import io.ktor.utils.io.*
 
 public class AsyncSmtpClientWriter(writer: AsyncWriterStream) : AsyncSmtpWriter, AsyncWriterStream by writer {
     public suspend fun writeDiscriminator(command: SmtpCommand) {
@@ -17,7 +17,7 @@ public class AsyncSmtpClientWriter(writer: AsyncWriterStream) : AsyncSmtpWriter,
         writeIsFinal() // AFAIK all commands are one line
 
         @Suppress("UNCHECKED_CAST") // we own this enum. this should always be safe
-        (command.tag.serializer as SmtpCommandSerializer<T>).serialize(command, this)
+        (command.tag.serializer as SmtpCommandSerializer<in T>).serialize(command, this)
 
         flush()
     }

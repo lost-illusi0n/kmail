@@ -14,3 +14,5 @@ val KMAIL_ASCII = """
  '    \  \  \              \ \._,\ '/         
 '------'  '---'             `--'  `"          
 """.removePrefix("\n")
+
+val POP3_SERVER = 110

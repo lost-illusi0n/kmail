@@ -1,32 +1,44 @@
 package dev.sitar.kmail.runner
 
+import dev.sitar.kmail.agents.smtp.submission.SmtpAuthenticatedUser
+import dev.sitar.kmail.agents.smtp.submission.SubmissionAuthenticationManager
+import dev.sitar.kmail.agents.smtp.submission.SubmissionConfig
+import dev.sitar.kmail.agents.smtp.submission.SubmissionServer
+import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
 import dev.sitar.kmail.smtp.Path
 import dev.sitar.kmail.smtp.PlainSaslMechanism
 import dev.sitar.kmail.smtp.SaslMechanism
-import dev.sitar.kmail.smtp.agent.SmtpAuthenticatedUser
-import dev.sitar.kmail.smtp.agent.SubmissionAgent
-import dev.sitar.kmail.smtp.agent.SubmissionAuthenticationManager
-import dev.sitar.kmail.smtp.agent.SubmissionConfig
-import dev.sitar.kmail.smtp.agent.transports.server.SmtpServerTransportClient
-import kotlinx.coroutines.coroutineScope
+import dev.sitar.kmail.utils.server.ServerSocketFactory
 import mu.KotlinLogging
+import kotlin.coroutines.coroutineContext
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun submission(client: SmtpServerTransportClient) = coroutineScope {
+suspend fun submission(factory: ServerSocketFactory): SubmissionServer {
     logger.info("SMTP submission agent is starting.")
 
-    val agent = SubmissionAgent(
-        SubmissionConfig(CONFIGURATION.domain, requiresEncryption = true),
-        client.bind(),
-        KmailAuthenticationManager,
-        coroutineContext
-    )
-
-    agent.launch()
+    val socket = factory.bind(SMTP_SUBMISSION_PORT)
+    val server = SubmissionServer(socket, SubmissionConfig(CONFIGURATION.domain, requiresEncryption = true, KmailAuthenticationManager), coroutineContext)
+    server.listen()
 
     logger.info("SMTP submission agent has started.")
-    agent
+
+    return server
+//    val agent = SubmissionAgentd(
+//        SubmissionConfig(CONFIGURATION.domain, requiresEncryption = true),
+//        client.bind(),
+//        KmailAuthenticationManager,
+//        coroutineContext
+//    )
+
+//    val agent = SubmissionAgent(
+//        factory.bind()
+//    )
+//
+//    agent.launch()
+//
+//    logger.info("SMTP submission agent has started.")
+//    agent
 }
 
 data class KmailAuthenticatedUser(val email: String) : SmtpAuthenticatedUser

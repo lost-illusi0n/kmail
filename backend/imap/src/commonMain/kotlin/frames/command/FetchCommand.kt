@@ -3,7 +3,6 @@ package dev.sitar.kmail.imap.frames.command
 import dev.sitar.kio.async.readers.AsyncReader
 import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.imap.frames.DataItem
-import dev.sitar.kmail.imap.readList
 import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
 

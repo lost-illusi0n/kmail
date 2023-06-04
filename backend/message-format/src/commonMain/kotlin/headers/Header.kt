@@ -1,12 +1,8 @@
 package dev.sitar.kmail.message.headers
 
-import dev.sitar.kio.buffers.SequentialReader
-import dev.sitar.kmail.message.*
-import dev.sitar.kmail.message.readUtf8StringUntil
-
-public data class Header(val fieldName: String, val fieldBody: String) {
-    public companion object {
-        public fun fromText(header: String): Header {
+data class Header(val fieldName: String, val fieldBody: String) {
+    companion object {
+        fun fromText(header: String): Header {
             val separator = header.indexOf(':')
             if (separator == -1) error("invalid header")
 

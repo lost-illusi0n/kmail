@@ -1,0 +1,11 @@
+- [x] transfer email out (send)
+- [x] transfer email in (recv)
+- [x] submit email
+- [ ] store email
+- [x] retrieve mail
+  - [x] pop 3
+  - [ ] imap
+- [x] generic smtp server/client implementation
+- [] error handling
+- [] config
+- [] PROXY protocol support

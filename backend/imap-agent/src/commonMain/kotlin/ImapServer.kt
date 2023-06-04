@@ -1,12 +1,10 @@
 package dev.sitar.kmail.imap.agent
 
-import dev.sitar.kmail.imap.agent.transports.ImapServerTransportClient
 import dev.sitar.kmail.imap.agent.transports.ImapServerTransport
 import kotlinx.coroutines.*
 import mu.KotlinLogging
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.coroutineContext
 
 private val logger = KotlinLogging.logger { }
 

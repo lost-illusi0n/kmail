@@ -2,26 +2,22 @@ package dev.sitar.kmail.smtp.frames.replies
 
 import dev.sitar.kmail.smtp.Domain
 
-public typealias EhloKeyword = String
-
-public typealias EhloParam = String?
-
-public const val STARTTLS: EhloKeyword = "STARTTLS"
+public const val STARTTLS: String = "STARTTLS"
 
 public data class EhloCompletion(
     val domain: Domain,
     val greet: String?,
-    val capabilities: Map<EhloKeyword, EhloParam>
+    val capabilities: List<String>
 ) :
     SmtpReply.PositiveCompletion by SmtpReply.PositiveCompletion.Default(
         code = 250,
-        lines = listOf("${domain.asString()}${greet?.let { " $it" }}") + capabilities.map { (key, param) -> "$key${param?.let { " $it" } ?: ""}" }
+        lines = listOf("${domain.asString()}${greet?.let { " $it" }}") + capabilities
     ) {
     public companion object {
         public fun from(lines: List<String>): EhloCompletion {
             lateinit var domain: String
             var greet: String? = null
-            var capabilities: Map<EhloKeyword, EhloParam> = emptyMap()
+            var capabilities: List<String> = emptyList()
 
             for ((index, line) in lines.withIndex()) {
                 when (index) {
@@ -36,12 +32,7 @@ public data class EhloCompletion(
                     }
 
                     else -> {
-                        capabilities = lines.asSequence().drop(1).associate {
-                            when (val index = it.indexOf(' ')) {
-                                -1 -> it to null
-                                else -> it.substring(0..index) to it.substring(index)
-                            }
-                        }
+                        capabilities = lines.drop(1)
                     }
                 }
             }

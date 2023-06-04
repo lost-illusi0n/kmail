@@ -5,7 +5,8 @@ import dev.sitar.kio.buffers.DefaultBufferPool
 import dev.sitar.kio.fullSlice
 import dev.sitar.kio.use
 import dev.sitar.kmail.message.Message
-import dev.sitar.kmail.smtp.*
+import dev.sitar.kmail.smtp.SmtpCommand
+import dev.sitar.kmail.smtp.SmtpCommandTag
 import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import kotlin.math.max
 
@@ -50,7 +51,7 @@ public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, Async
             TODO("input stopped but terminating sequence not found after data")
         }
 
-        return Message.fromText(data.decodeToString())
+        return Message.fromText(data.decodeToString().removePrefix("\r\n"))
     }
 }
 

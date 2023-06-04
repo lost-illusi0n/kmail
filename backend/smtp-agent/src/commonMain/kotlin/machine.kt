@@ -1,4 +1,4 @@
-package dev.sitar.kmail.smtp.agent
+package dev.sitar.kmail.agents.smtp
 
 import dev.sitar.kmail.smtp.frames.replies.SmtpReply
 
