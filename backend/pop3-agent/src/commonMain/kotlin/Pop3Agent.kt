@@ -96,18 +96,18 @@ sealed interface State {
                         agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount} messages (${maildrop.dropSize} octets)"))
 
                         repeat(maildrop.messageCount) {
-                            agent.transport.sendReply(Pop3Reply.DataReply("${it + 1} ${maildrop.getMessageSize(it)}"))
+                            agent.transport.sendReply(Pop3Reply.DataReply("${it + 1} ${maildrop.messages[it].size}"))
                         }
 
                         agent.transport.sendReply(Pop3Reply.DataReply("."))
                     } else {
-                        agent.transport.sendReply(Pop3Reply.OkReply("$message ${maildrop.getMessageSize(message - 1)}"))
+                        agent.transport.sendReply(Pop3Reply.OkReply("$message ${maildrop.messages[message - 1].size}"))
                     }
                 }
                 is RetrCommand -> {
-                    val message = maildrop.getMessage(context.command.messageNumber - 1)
-                    agent.transport.sendReply(Pop3Reply.OkReply("${message.length} octets"))
-                    agent.transport.sendReply(Pop3Reply.DataReply(message))
+                    val message = maildrop.messages[context.command.messageNumber - 1]
+                    agent.transport.sendReply(Pop3Reply.OkReply("${message.size} octets"))
+                    agent.transport.sendReply(Pop3Reply.DataReply(message.getContent()))
                     agent.transport.sendReply(Pop3Reply.DataReply("."))
                 }
                 else -> context.wasProcessed = false

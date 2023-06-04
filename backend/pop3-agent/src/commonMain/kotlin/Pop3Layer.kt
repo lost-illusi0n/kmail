@@ -7,13 +7,17 @@ interface Pop3Layer {
 }
 
 interface Pop3Maildrop {
-    val messageCount: Int
-    val dropSize: Int
+    val messages: List<Pop3Message>
 
-    //TODO: replace this with just a collection or smth with a modeled message struct
-    fun getMessageSize(index: Int): Int
-    fun getMessage(index: Int): String
-    fun deleteMessage(index: Int)
+    val messageCount: Int get() = messages.size
+    val dropSize: Int get() = messages.sumOf { it.size }
 
     fun commit()
+}
+
+interface Pop3Message {
+    val size: Int
+    val deleted: Boolean
+    fun getContent(): String
+    fun delete()
 }

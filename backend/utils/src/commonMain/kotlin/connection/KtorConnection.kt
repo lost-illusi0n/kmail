@@ -5,7 +5,6 @@ import dev.sitar.kmail.utils.io.AsyncWriterStream
 import dev.sitar.kmail.utils.io.toAsyncReader
 import dev.sitar.kmail.utils.io.toAsyncWriterStream
 import io.ktor.network.sockets.*
-import io.ktor.network.sockets.Connection
 import io.ktor.network.tls.*
 import kotlin.coroutines.coroutineContext
 

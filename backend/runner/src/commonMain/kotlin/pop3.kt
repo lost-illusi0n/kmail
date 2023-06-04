@@ -1,8 +1,7 @@
 package dev.sitar.kmail.runner
 
-import dev.sitar.kmail.agents.pop3.Pop3Layer
-import dev.sitar.kmail.agents.pop3.Pop3Maildrop
-import dev.sitar.kmail.agents.pop3.Pop3Server
+import dev.sitar.kmail.agents.pop3.*
+import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import kotlinx.coroutines.CoroutineScope
@@ -42,24 +41,23 @@ private suspend fun <T> ReceiveChannel<T>.asList(): MutableList<T> {
     }.toMutableList()
 }
 
-class KmailPop3Maildrop(val incomingMail: MutableList<InternetMessage>): Pop3Maildrop {
-    override val messageCount: Int
-        get() = incomingMail.size
+class KmailInMemoryPop3Message(val message: Message): Pop3Message {
+    private val content = message.asText()
 
-    override val dropSize: Int
-        get() = incomingMail.sumOf { it.message.asText().length }
+    override val size: Int = content.length
 
-    override fun getMessageSize(index: Int): Int {
-        return incomingMail[index].message.asText().length
+    override val deleted: Boolean
+        get() = false
+
+    override fun getContent(): String = content
+
+    override fun delete() {
+        TODO("Not yet implemented")
     }
+}
 
-    override fun getMessage(index: Int): String {
-        return incomingMail[index].message.asText()
-    }
-
-    override fun deleteMessage(index: Int) {
-        TODO()
-    }
+class KmailPop3Maildrop(private val incomingMail: MutableList<InternetMessage>): Pop3Maildrop {
+    override val messages: List<KmailInMemoryPop3Message> = incomingMail.map { KmailInMemoryPop3Message(it.message) }
 
     override fun commit() {
         TODO()
