@@ -5,6 +5,7 @@ import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.server.ServerSocket
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -15,10 +16,8 @@ private val logger = KotlinLogging.logger { }
 class TransferReceiveServer(
     val socket: ServerSocket,
     val config: TransferReceiveConfig,
+    val incoming: MutableSharedFlow<InternetMessage>
 ) {
-    private val mail = Channel<InternetMessage>()
-    val incomingMail: ReceiveChannel<InternetMessage> = mail
-
     suspend fun listen() {
         supervisorScope {
             while (isActive) {
@@ -29,7 +28,7 @@ class TransferReceiveServer(
                 launch {
                     val agent = TransferReceiveAgent(transport, config)
                     agent.handle()
-                    agent.incoming.collect { mail.send(it) }
+                    agent.incoming.collect { incoming.emit(it) }
                 }
             }
         }

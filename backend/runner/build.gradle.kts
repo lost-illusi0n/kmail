@@ -1,5 +1,6 @@
 plugins {
     kotlin("multiplatform")
+    kotlin("plugin.serialization")
 }
 
 repositories {
@@ -16,6 +17,10 @@ kotlin {
         implementation("org.apache.logging.log4j:log4j-api:2.19.0")
 
         implementation("io.ktor:ktor-network-tls-certificates:2.1.3")
+
+        implementation("com.akuleshov7:ktoml-core:0.5.0")
+        implementation("com.akuleshov7:ktoml-file:0.5.0")
+        implementation("com.akuleshov7:ktoml-source:0.5.0")
 
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
         implementation(project(":smtp-agent"))

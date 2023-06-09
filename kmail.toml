@@ -1,0 +1,21 @@
+domains = ["xgophers.com"]
+
+[security]
+# TODO: https://github.com/akuleshov7/ktoml/issues/99
+#certificates = [
+#    { path = "certs/xgophers.crt", key = "certs/private.key" }
+#]
+certificatePaths = ["certs/xgophers.crt"]
+certificateKeys = ["certs/private.pem"]
+
+[imap]
+enabled = false
+
+[pop3]
+enabled = true
+
+[smtp.submission]
+enabled = true
+
+[smtp.transfer]
+enabled = true

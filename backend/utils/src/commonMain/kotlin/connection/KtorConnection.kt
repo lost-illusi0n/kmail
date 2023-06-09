@@ -6,9 +6,10 @@ import dev.sitar.kmail.utils.io.toAsyncReader
 import dev.sitar.kmail.utils.io.toAsyncWriterStream
 import io.ktor.network.sockets.*
 import io.ktor.network.tls.*
+import java.security.KeyStore
 import kotlin.coroutines.coroutineContext
 
-class KtorConnection(val socket: Socket, override val isSecure: Boolean) : Connection {
+class KtorConnection(val socket: Socket, val tlsConfig: TLSConfig, override val isSecure: Boolean) : Connection {
     // raw ktor r/w channels
     private val writeChannel = socket.openWriteChannel()
     private val readChannel = socket.openReadChannel()
@@ -22,7 +23,7 @@ class KtorConnection(val socket: Socket, override val isSecure: Boolean) : Conne
     override suspend fun secureAsClient(): Connection {
         if (isSecure) return this
 
-        return KtorConnection(Connection(socket, readChannel, writeChannel).tls(coroutineContext), isSecure = true)
+        return KtorConnection(Connection(socket, readChannel, writeChannel).tls(coroutineContext, tlsConfig), tlsConfig, isSecure = true)
     }
 
     override suspend fun secureAsServer(): Connection {

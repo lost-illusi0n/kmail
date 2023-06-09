@@ -6,6 +6,8 @@
   - [x] pop 3
   - [ ] imap
 - [x] generic smtp server/client implementation
-- [] error handling
-- [] config
-- [] PROXY protocol support
+- [ ] error handling
+- [ ] config
+  - [x] toml
+  - [ ] env override
+- [ ] PROXY protocol support

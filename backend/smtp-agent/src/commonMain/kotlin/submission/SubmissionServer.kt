@@ -17,15 +17,10 @@ private val logger = KotlinLogging.logger { }
 class SubmissionServer(
     val socket: ServerSocket,
     val config: SubmissionConfig,
-    coroutineContext: CoroutineContext = EmptyCoroutineContext
+    val incoming: MutableSharedFlow<InternetMessage>
 ) {
-    private val scope = CoroutineScope(CoroutineName("smtp-submission-server") + SupervisorJob() + coroutineContext)
-
-    private val mail = MutableSharedFlow<InternetMessage>()
-    val incomingMail: SharedFlow<InternetMessage> = mail.shareIn(scope, SharingStarted.Eagerly)
-
-    fun listen() {
-        scope.launch {
+    suspend fun listen() {
+        supervisorScope {
             while (isActive) {
                 val transport = SmtpServerTransport(socket.accept())
 
@@ -34,7 +29,7 @@ class SubmissionServer(
                 launch {
                     val agent = SubmissionAgent(transport, config)
                     agent.handle()
-                    agent.incoming.collect { mail.emit(it) }
+                    agent.incoming.collect { incoming.emit(it) }
                 }
             }
         }

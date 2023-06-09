@@ -4,19 +4,19 @@ import dev.sitar.kmail.agents.pop3.*
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.server.ServerSocketFactory
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun CoroutineScope.pop3Server(socket: ServerSocketFactory, layer: Pop3Layer): Pop3Server {
+suspend fun pop3(socket: ServerSocketFactory, layer: Pop3Layer): Pop3Server = coroutineScope {
     logger.info("Starting Pop3 server.")
     val server = Pop3Server(socket.bind(POP3_SERVER), layer)
     launch { server.listen() }
     logger.info("Started Pop3 server.")
-    return server
+    server
 }
 
 class KmailPop3Layer(val incomingMail: ReceiveChannel<InternetMessage>): Pop3Layer {

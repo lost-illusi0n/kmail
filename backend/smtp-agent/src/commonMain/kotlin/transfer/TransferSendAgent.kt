@@ -17,6 +17,7 @@ import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.smtp.Path
 import dev.sitar.kmail.smtp.frames.reply.SmtpReply
 import dev.sitar.kmail.smtp.frames.reply.SmtpReplyCode
+import dev.sitar.kmail.utils.connection.KtorConnectionFactory
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -28,7 +29,7 @@ private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // G
 data class TransferConfig(
     val domain: Domain,
     val requireEncryption: Boolean,
-    val connector: SmtpServerConnector = DefaultTransferSessionSmtpConnector(),
+    val connector: SmtpServerConnector = DefaultTransferSessionSmtpConnector(KtorConnectionFactory()),
 )
 
 class TransferSendConnection(

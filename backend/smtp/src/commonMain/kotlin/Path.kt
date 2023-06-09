@@ -3,6 +3,8 @@ package dev.sitar.kmail.smtp
 import dev.sitar.dns.utils.NetworkAddress
 import dev.sitar.kio.fullSlice
 
+public fun String.asPath(): Path = Path.fromText(this)!!
+
 public data class Path(val atDomain: String?, val mailbox: Mailbox) {
     public fun asText(): String {
         return "<${atDomain?.plus(":") ?: ""}${mailbox.asText()}>"

@@ -1,32 +1,26 @@
 package dev.sitar.kmail.runner
 
-import dev.sitar.kmail.agents.smtp.SmtpServerConnector
+import dev.sitar.kmail.smtp.InternetMessage
+import dev.sitar.kmail.utils.connection.ConnectionFactory
 import dev.sitar.kmail.utils.server.ServerSocketFactory
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.job
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.produceIn
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun run(
-//    imapServerClient: ImapServerTransportClient,
-//    smtpServerClient: SmtpServerTransportClient,
-    connector: SmtpServerConnector,
-    serverSocketFactory: ServerSocketFactory,
-//    submissionServerFactory: TlsCapableSmtpServerSocketFactory,
-//    transferServerFactory: TlsCapableSmtpServerSocketFactory,
-) = withContext(SupervisorJob()) {
+@OptIn(FlowPreview::class)
+suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: ConnectionFactory) = supervisorScope {
     println(KMAIL_ASCII)
     logger.info("Kmail is starting.")
 
-//    val imapServer = imapServer(imapServerClient)
+    val incoming = MutableSharedFlow<InternetMessage>()
+    val outgoing = MutableSharedFlow<InternetMessage>()
 
-    val submissionServer = submission(serverSocketFactory)
-
-    val receiveServer = transfer(submissionServer.incomingMail, connector, serverSocketFactory)
-
-    val pop3Server = pop3Server(serverSocketFactory, KmailPop3Layer(receiveServer.incomingMail))
+    if (Config.pop3.enabled) launch { pop3(serverSocketFactory, KmailPop3Layer(incoming.produceIn(this))) }
+    if (Config.smtp.submission.enabled) launch { submission(serverSocketFactory, outgoing) }
+    if (Config.smtp.transfer.enabled) launch { transfer(serverSocketFactory, connectionFactory, outgoing, incoming) }
 
     coroutineContext.job.join()
 }

@@ -1,36 +1,64 @@
 package dev.sitar.kmail.runner
 
-import io.ktor.network.tls.certificates.*
 import mu.KotlinLogging
-import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
+import java.security.KeyFactory
 import java.security.KeyStore
+import java.security.cert.Certificate
+import java.security.cert.CertificateFactory
+import java.security.spec.PKCS8EncodedKeySpec
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 
+
 private val logger = KotlinLogging.logger { }
 
-fun ssl(): SSLContext {
-    val ssl = SSLContext.getInstance("TLS")
+private fun InputStream.load(): Array<Certificate> {
+    logger.debug { "Loading certificates from input stream." }
+    val factory = CertificateFactory.getInstance("X.509")
 
-    val keyStore = if (File("./certs/root.keystore").exists()) {
-        logger.debug { "Found an existing keystore!" }
+    return buildList {
+        while (available() > 0) {
+            val cert = factory.generateCertificate(this@load)
+            add(cert)
+            logger.debug { "Generated a certificate." }
+            logger.trace { cert }
+        }
+    }.toTypedArray()
+}
 
-        val keyStore = KeyStore.getInstance("JKS")
+fun ssl(): Pair<SSLContext, KeyStore> {
+    val keyStore = KeyStore.getInstance("PKCS12")
+    keyStore.load(null, null)
 
-        keyStore.load(File("./certs/root.keystore").inputStream(), CONFIGURATION.keystorePassword!!.toCharArray())
+    Config.security.certificatePaths.forEachIndexed { i, certPath ->
+        logger.debug { "Loading certificates for $certPath." }
 
-        keyStore
-    } else {
-        logger.debug { "Generating a self-signed certificate." }
-        val keyStore = generateCertificate(file = File("./certs/root.keystore"), keyAlias = "example", keyPassword = CONFIGURATION.keystorePassword!!)
-        logger.debug { "Generated a self-signed certificate." }
+        val keyPath = Config.security.certificateKeys[i]
 
-        keyStore
+        FileInputStream(certPath).use { certStream ->
+            certStream.load().apply {
+                forEachIndexed { i, cert ->
+                    keyStore.setCertificateEntry(certPath, cert)
+                }
+
+                keyStore.setKeyEntry("private",
+                    KeyFactory.getInstance("RSA")
+                        .generatePrivate(PKCS8EncodedKeySpec(FileInputStream(keyPath).readAllBytes())),
+                    null,
+                    this
+                )
+            }
+        }
     }
 
+    logger.debug { "Generating SSL context." }
+    val ssl = SSLContext.getInstance("TLS")
+
     val keyManagerFactory = KeyManagerFactory.getInstance("SunX509")
-    keyManagerFactory.init(keyStore, CONFIGURATION.keystorePassword.toCharArray())
+    keyManagerFactory.init(keyStore, null)
 
     val trustManagerFactory = TrustManagerFactory.getInstance("SunX509")
     trustManagerFactory.init(keyStore)
@@ -39,5 +67,5 @@ fun ssl(): SSLContext {
 
     logger.debug { "Generated SSL context." }
 
-    return ssl
+    return ssl to keyStore
 }
