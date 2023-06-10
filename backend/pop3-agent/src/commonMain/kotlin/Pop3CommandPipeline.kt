@@ -6,7 +6,7 @@ import dev.sitar.kmail.pop3.commands.Pop3Command
 
 data class Pop3CommandContext(val command: Pop3Command, var wasProcessed: Boolean)
 
-class Pop3CommandPipeline: Pipeline<Pop3CommandContext>(setOf(Logging, Before, Processing, After), { it.wasProcessed }) {
+class Pop3CommandPipeline: Pipeline<Pop3CommandContext>(setOf(Logging, Before, Processing, After)) {
     companion object {
         val Logging = Stage("Logging")
         val Before = Stage("Before")

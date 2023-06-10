@@ -2,6 +2,7 @@ package dev.sitar.kmail.runner
 
 import com.akuleshov7.ktoml.file.TomlFileReader
 import com.akuleshov7.ktoml.source.TomlSourceReader
+import dev.sitar.kmail.agents.smtp.transfer.Proxy
 import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
 import dev.sitar.kmail.agents.smtp.transports.SMTP_TRANSFER_PORT
 import dev.sitar.kmail.smtp.Domain
@@ -31,6 +32,8 @@ object DomainSerializer: KSerializer<Domain> {
 @Serializable
 data class KmailConfig(
     val domains: List<@Serializable(with = DomainSerializer::class) Domain>,
+//    val accounts: List<Account>, // TODO: maybe dont hardcode accounts in a config
+    val proxy: Proxy? = null,
     val security: Security,
     val smtp: Smtp,
     val imap: Imap,
@@ -44,6 +47,27 @@ data class KmailConfig(
 //        @Serializable
 //        data class CertificateAndKey(val certificate: String, val key: String)
 //    }
+    // TODO: wait for issue99 to be fixed
+    val accounts = listOf(Account("catlover69", "password1234", "mail@xgopher.de"))
+
+    @Serializable
+    data class Account(
+        val username: String,
+        val password: String, // TODO: lol plaintext password
+        val email: String
+    )
+
+    @Serializable
+    data class Proxy(
+        val ip: String,
+        val port: Int
+    ) {
+        // TODO: unify this
+        fun intoSmtpProxy(): dev.sitar.kmail.agents.smtp.transfer.Proxy {
+            return dev.sitar.kmail.agents.smtp.transfer.Proxy(ip, port)
+        }
+    }
+
     @Serializable
     data class Security(
         val certificatePaths: List<String>,
@@ -58,7 +82,7 @@ data class KmailConfig(
         @Serializable
         data class Submission(val enabled: Boolean, val port: Int = SMTP_SUBMISSION_PORT)
         @Serializable
-        data class Transfer(val enabled: Boolean, val port: Int = SMTP_TRANSFER_PORT)
+        data class Transfer(val enabled: Boolean, val encryption: Boolean = true, val port: Int = SMTP_TRANSFER_PORT)
     }
 
     @Serializable

@@ -4,6 +4,7 @@ import dev.sitar.kmail.agents.pop3.*
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.server.ServerSocketFactory
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -13,27 +14,31 @@ private val logger = KotlinLogging.logger { }
 
 suspend fun pop3(socket: ServerSocketFactory, layer: Pop3Layer): Pop3Server = coroutineScope {
     logger.info("Starting Pop3 server.")
+
     val server = Pop3Server(socket.bind(POP3_SERVER), layer)
     launch { server.listen() }
+
     logger.info("Started Pop3 server.")
+
     server
 }
 
-class KmailPop3Layer(val incomingMail: ReceiveChannel<InternetMessage>): Pop3Layer {
+class KmailPop3Layer(val storage: StorageLayer): Pop3Layer {
     override suspend fun userExists(user: String): Boolean {
-        return user.contentEquals("catlover69")
+        return Config.accounts.any { it.username.contentEquals(user) }
     }
 
     override suspend fun login(user: String, password: String): Boolean {
-        return user.contentEquals("catlover69") && password.contentEquals("password1234")
+        return Config.accounts.any { it.username.contentEquals(user) && it.password.contentEquals(password) }
     }
 
     override suspend fun maildrop(user: String): Pop3Maildrop {
-        return KmailPop3Maildrop(incomingMail.asList())
+        return KmailPop3Maildrop(storage.user(user))
     }
 }
 
-private suspend fun <T> ReceiveChannel<T>.asList(): MutableList<T> {
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun <T> ReceiveChannel<T>.asList(): MutableList<T> {
     return buildList {
         while (!isClosedForReceive) {
             add(tryReceive().getOrNull() ?: break)
@@ -56,8 +61,8 @@ class KmailInMemoryPop3Message(val message: Message): Pop3Message {
     }
 }
 
-class KmailPop3Maildrop(private val incomingMail: MutableList<InternetMessage>): Pop3Maildrop {
-    override val messages: List<KmailInMemoryPop3Message> = incomingMail.map { KmailInMemoryPop3Message(it.message) }
+class KmailPop3Maildrop(private val storage: UserStorageLayer): Pop3Maildrop {
+    override val messages: List<KmailInMemoryPop3Message> = storage.messages.asList().map { KmailInMemoryPop3Message(it.message) }
 
     override fun commit() {
         TODO()

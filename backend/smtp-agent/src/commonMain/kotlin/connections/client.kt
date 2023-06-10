@@ -108,7 +108,8 @@ class SecureObjective(override val client: ClientConnection, requiresEncryption:
 
         if ("STARTTLS" !in client.ehloObjective.capabilities) {
             if (!isOptional) TODO("encryption pls")
-            TODO("continuing without encryption")
+            logger.debug { "Continuing without encryption." }
+            return
         }
 
         client.transport.send(StartTlsCommand)

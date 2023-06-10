@@ -1,10 +1,7 @@
 package dev.sitar.kmail.runner
 
 import dev.sitar.kmail.agents.smtp.DefaultTransferSessionSmtpConnector
-import dev.sitar.kmail.agents.smtp.transfer.TransferConfig
-import dev.sitar.kmail.agents.smtp.transfer.TransferReceiveConfig
-import dev.sitar.kmail.agents.smtp.transfer.TransferReceiveServer
-import dev.sitar.kmail.agents.smtp.transfer.TransferServer
+import dev.sitar.kmail.agents.smtp.transfer.*
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.connection.ConnectionFactory
 import dev.sitar.kmail.utils.server.ServerSocketFactory
@@ -27,7 +24,8 @@ suspend fun transfer(
     val server = TransferServer(
         TransferConfig(
             Config.domains.first(),
-            requireEncryption = true,
+            requireEncryption = Config.smtp.transfer.encryption,
+            proxy = Config.proxy?.intoSmtpProxy(),
             connector = DefaultTransferSessionSmtpConnector(connectionFactory)
         ), outgoingMessages
     )

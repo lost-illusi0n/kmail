@@ -122,6 +122,7 @@ class MailExtension(override val server: ServerConnection): ServerExtension {
             incoming.close(it)
         }
 
+        // TODO: spam filtering???
         server.transport.commandPipeline {
             filter(SmtpCommandPipeline.Process) {
                 if (command !is MailCommand) return@filter
@@ -134,6 +135,9 @@ class MailExtension(override val server: ServerConnection): ServerExtension {
             filter(SmtpCommandPipeline.Process) {
                 if (command !is RecipientCommand) return@filter
 
+                // TODO: can we send mail to this rcpt?
+//                // TODO: check to see if we batch transfer recipients on send
+//                if (command.to.asText().removeSurrounding('<', '>'))
                 state!!.rcpts.add(command.to)
 
                 server.transport.send(OkCompletion("Ok."))
@@ -146,11 +150,7 @@ class MailExtension(override val server: ServerConnection): ServerExtension {
                 server.transport.connection.value.reader.discard(2)
                 server.transport.send(StartMailInputIntermediary("End message with <CR><LF>.<CR><LF>"))
 
-                println("reading mail")
-
                 state!!.msg = server.transport.recvMail()
-
-                println("read mail")
 
                 val internetMessage = state!!.toInternetMessage()
 

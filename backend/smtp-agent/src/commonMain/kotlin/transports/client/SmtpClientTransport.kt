@@ -32,8 +32,6 @@ class SmtpClientTransport(connection: Connection, coroutineContext: CoroutineCon
 
     init {
         this.connection.onEach {
-            println("updating reader/writers")
-
             reader = it.reader.asAsyncSmtpClientReader()
             writer = it.writer.asAsyncSmtpClientWriter()
             lock.unlock()

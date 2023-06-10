@@ -13,17 +13,17 @@ class Pop3Server(
     val socket: ServerSocket,
     val layer: Pop3Layer,
 ) {
-    suspend fun listen() {
-        supervisorScope {
-            while (isActive) {
-                val transport = Pop3ServerTransport(socket.accept())
+    suspend fun listen() = supervisorScope {
+        while (isActive) {
+            println("waiting for pop3 socket")
+            val transport = Pop3ServerTransport(socket.accept())
+            println("got a pop3 socket: $isActive")
 
-                launch {
-                    logger.debug { "Accepted a connection from ${transport.remote}." }
+            launch {
+                logger.debug { "Accepted a connection from ${transport.remote}." }
 
-                    val agent = Pop3Agent(transport, layer)
-                    agent.handle()
-                }
+                val agent = Pop3Agent(transport, layer)
+                agent.handle()
             }
         }
     }

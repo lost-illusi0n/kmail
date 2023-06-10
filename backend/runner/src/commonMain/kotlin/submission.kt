@@ -40,8 +40,7 @@ object KmailAuthenticationManager : SubmissionAuthenticationManager<KmailAuthent
         // TODO: base authentication settings off of config
         when (mechanism) {
             is PlainSaslMechanism -> {
-                // TODO: use some kind of db to store users
-                if (mechanism.authenticationIdentity == "example" && mechanism.password == "example") {
+                if (Config.accounts.any { mechanism.authenticationIdentity.contentEquals(it.username) && mechanism.password.contentEquals(it.password) }) {
                     return KmailAuthenticatedUser(mechanism.authorizationIdentity)
                 }
             }

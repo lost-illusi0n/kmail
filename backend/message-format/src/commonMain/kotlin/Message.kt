@@ -11,6 +11,7 @@ data class Message(
     companion object {
         fun fromText(raw: String): Message {
             val buffer = raw.encodeToByteArray().asBuffer()
+            println(raw)
             val headers = mutableSetOf<Header>()
             var body: String? = null
 
@@ -18,8 +19,8 @@ data class Message(
                 var line = buffer.readUtf8UntilMailEnding()
 
                 // unfolding
-                while (buffer.peek() == ' '.code.toByte()) {
-                    line += buffer.readUtf8UntilMailEnding()
+                while (buffer.peek() == ' '.code.toByte() || buffer.peek() == '\t'.code.toByte()) {
+                    line += "\r\n" + buffer.readUtf8UntilMailEnding()
                 }
 
                 if (line.isEmpty()) {

@@ -9,7 +9,9 @@ import kotlinx.coroutines.delay
 import java.util.concurrent.Future
 
 suspend fun main(): Unit = coroutineScope {
-    System.setProperty("javax.net.debug", "all")
+    dns()
+
+//    System.setProperty("javax.net.debug", "all")
 
     val (ssl, keystore) = ssl()
     val socketFactory = TlsCapableServerSocketFactory(ssl)

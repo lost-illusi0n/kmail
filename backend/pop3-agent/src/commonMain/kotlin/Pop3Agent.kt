@@ -3,8 +3,10 @@ package dev.sitar.kmail.agents.pop3
 import dev.sitar.kmail.agents.pop3.transports.Pop3ServerTransport
 import dev.sitar.kmail.pop3.commands.*
 import dev.sitar.kmail.pop3.replies.Pop3Reply
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -16,13 +18,13 @@ class Pop3Agent(
     var state: State = State.Authorization(this@Pop3Agent)
 
     suspend fun handle() = coroutineScope {
-        transport.apply { startPipeline() }
+        launch { transport.startPipeline() }
 
         transport.sendReply(Pop3Reply.OkReply("kmail pop3 service"))
 
         transport.commandPipeline {
             filter(Pop3CommandPipeline.Logging) {
-                logger.trace { "$command" }
+                logger.trace { "<<< $command" }
             }
 
             filter(Pop3CommandPipeline.Before) {
@@ -42,6 +44,8 @@ class Pop3Agent(
 
                 if (command is QuitCommand) {
                     cancel()
+                    transport.connection.close()
+                    awaitCancellation()
                 }
 
                 // bad command in state (not processed)

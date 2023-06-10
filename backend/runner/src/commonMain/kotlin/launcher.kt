@@ -4,23 +4,26 @@ import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.connection.ConnectionFactory
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.produceIn
+import kotlinx.coroutines.flow.*
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
 @OptIn(FlowPreview::class)
 suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: ConnectionFactory) = supervisorScope {
-    println(KMAIL_ASCII)
-    logger.info("Kmail is starting.")
+    withContext(CoroutineExceptionHandler { coroutineContext, throwable -> logger.error(throwable) { } }) {
+        println(KMAIL_ASCII)
+        logger.info("Kmail is starting.")
 
-    val incoming = MutableSharedFlow<InternetMessage>()
-    val outgoing = MutableSharedFlow<InternetMessage>()
+        val incoming = MutableSharedFlow<InternetMessage>()
+        val outgoing = MutableSharedFlow<InternetMessage>()
 
-    if (Config.pop3.enabled) launch { pop3(serverSocketFactory, KmailPop3Layer(incoming.produceIn(this))) }
-    if (Config.smtp.submission.enabled) launch { submission(serverSocketFactory, outgoing) }
-    if (Config.smtp.transfer.enabled) launch { transfer(serverSocketFactory, connectionFactory, outgoing, incoming) }
+        val storage = KmailInMemoryStorageLayer()
+        launch { storage(storage, incoming) }
+        if (Config.pop3.enabled) launch { pop3(serverSocketFactory, KmailPop3Layer(storage)) }
+        if (Config.smtp.submission.enabled) launch { submission(serverSocketFactory, outgoing) }
+        if (Config.smtp.transfer.enabled) launch { transfer(serverSocketFactory, connectionFactory, outgoing, incoming) }
 
-    coroutineContext.job.join()
+        coroutineContext.job.join()
+    }
 }

@@ -10,4 +10,9 @@
 - [ ] config
   - [x] toml
   - [ ] env override
-- [ ] PROXY protocol support
+- [x] PROXY protocol support
+- [ ] secure/spam control mechanisms
+  - reverse dns
+  - dmarc
+  - dkim
+  - spf

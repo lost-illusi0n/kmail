@@ -6,7 +6,6 @@ import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
 import dev.sitar.kmail.agents.smtp.DefaultTransferSessionSmtpConnector
 import dev.sitar.kmail.agents.smtp.SmtpServerConnector
-import dev.sitar.kmail.agents.smtp.StepProgression
 import dev.sitar.kmail.agents.smtp.rewrite.ClientConnection
 import dev.sitar.kmail.agents.smtp.rewrite.ClientObjective
 import dev.sitar.kmail.agents.smtp.rewrite.MailObjective
@@ -15,8 +14,6 @@ import dev.sitar.kmail.agents.smtp.transports.client.SmtpClientTransport
 import dev.sitar.kmail.smtp.Domain
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.smtp.Path
-import dev.sitar.kmail.smtp.frames.reply.SmtpReply
-import dev.sitar.kmail.smtp.frames.reply.SmtpReplyCode
 import dev.sitar.kmail.utils.connection.KtorConnectionFactory
 import mu.KotlinLogging
 
@@ -29,8 +26,11 @@ private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // G
 data class TransferConfig(
     val domain: Domain,
     val requireEncryption: Boolean,
+    val proxy: Proxy? = null,
     val connector: SmtpServerConnector = DefaultTransferSessionSmtpConnector(KtorConnectionFactory()),
 )
+
+data class Proxy(val ip: String, val port: Int)
 
 class TransferSendConnection(
     transport: SmtpClientTransport,
@@ -74,102 +74,21 @@ class TransferSendAgent(
     }
 
     private suspend fun transferTo(rcpt: Path) {
-        val mxRecords = resolve(rcpt.mailbox.domain)
+        val transport = if (config.proxy != null) {
+            logger.debug { "Using proxy for transfer." }
 
-        logger.debug { "Resolved ${mxRecords.size} MX records.${mxRecords.joinToString(prefix = "\n", separator = "\n")}" }
+            SmtpClientTransport(config.connector.connectionFactory.connect(config.proxy.ip, config.proxy.port))
+        } else {
+            val mxRecords = resolve(rcpt.mailbox.domain)
 
-        val transport = mxRecords.firstNotNullOfOrNull { config.connector.connect(it) }
-            ?: TODO("could not connect to any exchange servers")
+            logger.debug { "Resolved ${mxRecords.size} MX records.${mxRecords.joinToString(prefix = "\n", separator = "\n")}" }
+
+            mxRecords.firstNotNullOfOrNull { config.connector.connect(it) }
+                ?: TODO("could not connect to any exchange servers")
+        }
 
         val client = TransferSendConnection(transport, config, message, rcpt)
 
         client.start()
-//
-//        machine {
-//            step {
-//                transport.recv().coerce()
-//            }
-//
-//            step {
-//                transport.send(EhloCommand(config.domain))
-//
-//                val ehlo: EhloReply = when (val resp = transport.recv() deserializeAs EhloReply) {
-//                    is Either.Left -> return@step StepProgression.Abort("Expected an EHLO reply, got ${resp.left} instead.")
-//                    is Either.Right -> resp.right
-//                }
-//
-//                if (transport.isSecure) return@step StepProgression.Continue
-//
-//                if (Capabilities.STARTTLS !in ehlo.capabilities) {
-//                    if (config.requireEncryption)  return@step StepProgression.Abort("Encryption is required however encryption could not be negotiated.")
-//                    else logger.debug { "Continuing the transfer of ${message.queueId} without any encryption!" }
-//
-//                    return@step StepProgression.Continue
-//                }
-//
-//                transport.send(StartTlsCommand)
-//
-//                if (transport.recv().code !is SmtpReplyCode.PositiveCompletion) TODO("no encryption")
-//
-//                logger.debug { "Starting TLS negotiations." }
-//                transport = transport.secure()
-//                logger.debug { "Upgraded connection to TLS."}
-//
-//                StepProgression.Retry
-//            }
-//
-//            // TODO: implement pipelining
-//            step {
-//                transport.send(MailCommand(message.envelope.originatorAddress))
-//                transport.recv().coerce()
-//            }
-//
-//            step {
-//                transport.send(RecipientCommand(rcpt))
-//                transport.recv().coerce()
-//            }
-//
-//            step {
-//                transport.send(DataCommand)
-//                transport.recv().coerce<SmtpReplyCode.PositiveIntermediate>()
-//            }
-//
-//            step {
-//                transport.sendMessage(message.message)
-//                transport.recv().coerce()
-//            }
-//
-//            stop {
-//                if (it is StopReason.Abrupt) {
-//                    logger.warn { "The transfer of ${message.queueId} to $rcpt was abruptly stopped because of: ${it.reason}" }
-//                } else {
-//                    logger.info { "The transfer of ${message.queueId} to $rcpt was successful." }
-//                }
-//
-//                transport.send(QuitCommand)
-//
-//                try {
-//                    transport.recv().coerce()
-//                } catch (_: Throwable) {
-//                }
-//
-//                transport.close()
-//            }
-//        }
-    }
-}
-
-private fun SmtpReply.coerce(): StepProgression {
-    return when (code) {
-        is SmtpReplyCode.PositiveCompletion -> StepProgression.Continue
-        else -> error("")
-    }
-}
-
-@JvmName("coerceTyped")
-private inline fun <reified T: SmtpReplyCode> SmtpReply.coerce(): StepProgression {
-    return when (code) {
-        is T -> StepProgression.Continue
-        else -> error("")
     }
 }
