@@ -48,7 +48,7 @@ data class KmailConfig(
 //        data class CertificateAndKey(val certificate: String, val key: String)
 //    }
     // TODO: wait for issue99 to be fixed
-    val accounts = listOf(Account("catlover69", "password1234", "mail@xgopher.de"))
+    val accounts = listOf(Account("catlover69", "password1234", "mail@localhost"))
 
     @Serializable
     data class Account(
@@ -96,7 +96,4 @@ data class KmailConfig(
     )
 }
 
-// TODO: read this from filesystem
 val Config: KmailConfig = TomlSourceReader.decodeFromString(KmailConfig.serializer(), File("kmail.toml").readLines())
-
-//    KmailConfig(Domain.fromText("[0.0.0.0]")!!, "changeme")

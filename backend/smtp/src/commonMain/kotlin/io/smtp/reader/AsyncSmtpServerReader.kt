@@ -15,6 +15,7 @@ public class AsyncSmtpServerReader(reader: AsyncReader) : AsyncSmtpReader, Async
         private val MESSAGE_TERMINATING_SEQUENCE = "\r\n.\r\n".toByteArray().fullSlice()
     }
 
+    // TODO: this is funny bad
     private suspend fun readSmtpCommandTag(): String {
         var lastChar = '\u0000'
 

@@ -37,7 +37,6 @@ data class KmailAuthenticatedUser(val email: String) : SmtpAuthenticatedUser
 
 object KmailAuthenticationManager : SubmissionAuthenticationManager<KmailAuthenticatedUser> {
     override fun authenticate(mechanism: SaslMechanism): KmailAuthenticatedUser? {
-        // TODO: base authentication settings off of config
         when (mechanism) {
             is PlainSaslMechanism -> {
                 if (Config.accounts.any { mechanism.authenticationIdentity.contentEquals(it.username) && mechanism.password.contentEquals(it.password) }) {

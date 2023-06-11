@@ -39,6 +39,7 @@ public data class HeloCommand(val domain: String) : SmtpCommand {
 
     public object Serializer: SmtpCommandSerializer<HeloCommand> {
         public override suspend fun serialize(command: HeloCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8(command.domain)
             output.writeLineEnd()
         }
@@ -54,6 +55,7 @@ public data class EhloCommand(val domain: Domain) : SmtpCommand {
 
     public object Serializer : SmtpCommandSerializer<EhloCommand> {
         public override suspend fun serialize(command: EhloCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8(command.domain.asString())
             output.writeLineEnd()
         }
@@ -69,6 +71,7 @@ public data class MailCommand(val from: Path /* params */) : SmtpCommand {
 
     public object Serializer : SmtpCommandSerializer<MailCommand> {
         public override suspend fun serialize(command: MailCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8("FROM:${command.from.asText()}")
             output.writeLineEnd()
         }
@@ -88,6 +91,7 @@ public data class RecipientCommand(val to: Path /* params */) : SmtpCommand {
 
     public object Serializer : SmtpCommandSerializer<RecipientCommand> {
         public override suspend fun serialize(command: RecipientCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
             output.writeStringUtf8("TO:${command.to.asText()}")
             output.writeLineEnd()
         }
@@ -160,9 +164,10 @@ public data class AuthenticationCommand(val mechanism: String, val response: Sas
     override val tag: SmtpCommandTag = SmtpCommandTag.Auth
 
     public object Serializer : SmtpCommandSerializer<AuthenticationCommand> {
-        public override suspend fun serialize(authentication: AuthenticationCommand, output: AsyncSmtpWriter) {
-            output.writeStringUtf8(authentication.mechanism)
-            authentication.response?.let { output.writeStringUtf8(" ${authentication.response.encode()}") }
+        public override suspend fun serialize(command: AuthenticationCommand, output: AsyncSmtpWriter) {
+            output.writeIsFinal()
+            output.writeStringUtf8(command.mechanism)
+            command.response?.let { output.writeStringUtf8(" ${command.response.encode()}") }
             output.writeLineEnd()
         }
 

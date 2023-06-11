@@ -11,7 +11,6 @@ data class Message(
     companion object {
         fun fromText(raw: String): Message {
             val buffer = raw.encodeToByteArray().asBuffer()
-            println(raw)
             val headers = mutableSetOf<Header>()
             var body: String? = null
 

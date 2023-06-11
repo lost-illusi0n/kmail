@@ -1,7 +1,9 @@
 package dev.sitar.kmail.runner
 
 import dev.sitar.dns.dnsResolver
+import dev.sitar.dns.records.MXResourceRecord
 import dev.sitar.dns.records.ResourceType
+import dev.sitar.dns.transports.DnsServer
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -13,10 +15,12 @@ suspend fun dns() {
     Config.domains.forEach {
         logger.info { "Checking $it." }
 
-        val records = dnsResolver.resolveRecursively(it.asString()) {
+        dnsResolver.resolveRecursively(it.asString()) {
             qType = ResourceType.MX
-        }
+        }.also { logger.info { it } }
 
-        println(records)
+        dnsResolver.resolveRecursively(it.asString()) {
+            qType = ResourceType.TXT
+        }.also { logger.info { it } }
     }
 }

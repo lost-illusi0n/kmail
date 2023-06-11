@@ -1,6 +1,9 @@
 package dev.sitar.kmail.agents.smtp.rewrite
 
+import dev.sitar.kio.async.readers.readBytes
 import dev.sitar.kmail.agents.smtp.queueId
+import dev.sitar.kmail.agents.smtp.transfer.TransferReceiveAgent
+import dev.sitar.kmail.agents.smtp.transfer.TransferReceiveServer
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpCommandPipeline
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.message.Message
@@ -11,15 +14,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.consumeAsFlow
 import mu.KotlinLogging
 
-//TODO: THE DOMAIN SHOULD POINT TO ADDRESS LITERAL OR A DOMAIN THAT RESOLVES TO A RR
-private const val GREET = "localhost ESMTP the revolutionary kmail :-)"
-
 private val logger = KotlinLogging.logger { }
 
-abstract class ServerConnection(val transport: SmtpServerTransport, domain: Domain) {
+abstract class ServerConnection(val transport: SmtpServerTransport, private val domain: Domain, addresses: List<String>? = null) {
     abstract val extensions: Set<ServerExtension>
 
-    private val mail by lazy { MailExtension(this) }
+    private val mail by lazy { MailExtension(this, addresses) }
 
     val incoming by lazy { mail.incoming.consumeAsFlow() }
 
@@ -34,7 +34,7 @@ abstract class ServerConnection(val transport: SmtpServerTransport, domain: Doma
 
         allExtensions.forEach(ServerExtension::apply)
 
-        transport.send(GreetCompletion(GREET))
+        transport.send(GreetCompletion("${domain.asString()} ESMTP the revolutionary kmail :-)"))
     }
 
     fun close() {
@@ -72,7 +72,7 @@ class EhloExtension(override val server: ServerConnection, val domain: Domain): 
             if (command is EhloCommand) {
                 val capabilities = server.allExtensions.flatMap { it.capabilities() }
 
-                server.transport.send(EhloCompletion(domain, GREET, capabilities))
+                server.transport.send(EhloCompletion(domain, "${domain.asString()} ESMTP the revolutionary kmail :-)", capabilities))
             }
         }
     }
@@ -84,7 +84,6 @@ class StartTlsExtension(override val server: ServerConnection): ServerExtension 
             filter(SmtpCommandPipeline.Process) {
                 if (command is StartTlsCommand) {
                     require(!server.transport.isSecure)
-                    println("skipped ${server.transport.connection.value.reader.discard(Int.MAX_VALUE)}")
                     server.transport.send(ReadyToStartTlsCompletion("start tls."))
 
                     logger.debug { "Starting TLS negotiations. ${System.currentTimeMillis()}" }
@@ -104,7 +103,7 @@ class StartTlsExtension(override val server: ServerConnection): ServerExtension 
     }
 }
 
-class MailExtension(override val server: ServerConnection): ServerExtension {
+class MailExtension(override val server: ServerConnection, val addresses: List<String>?) : ServerExtension {
     val incoming: Channel<InternetMessage> = Channel()
 
     private class State(
@@ -135,9 +134,10 @@ class MailExtension(override val server: ServerConnection): ServerExtension {
             filter(SmtpCommandPipeline.Process) {
                 if (command !is RecipientCommand) return@filter
 
-                // TODO: can we send mail to this rcpt?
-//                // TODO: check to see if we batch transfer recipients on send
-//                if (command.to.asText().removeSurrounding('<', '>'))
+                if (addresses?.contains(command.to.mailbox.asText()) == false) {
+                    server.transport.send(SmtpReply.PermanentNegative.Default(550, listOf("unknown user: ${command.to.mailbox.asText()}")))
+                    return@filter
+                }
                 state!!.rcpts.add(command.to)
 
                 server.transport.send(OkCompletion("Ok."))
@@ -146,8 +146,6 @@ class MailExtension(override val server: ServerConnection): ServerExtension {
             filter(SmtpCommandPipeline.Process) {
                 if (command !is DataCommand) return@filter
 
-                // TODO: for some reason object commands leave 2 unread bytes???
-                server.transport.connection.value.reader.discard(2)
                 server.transport.send(StartMailInputIntermediary("End message with <CR><LF>.<CR><LF>"))
 
                 state!!.msg = server.transport.recvMail()

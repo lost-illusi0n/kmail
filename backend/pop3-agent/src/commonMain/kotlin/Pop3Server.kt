@@ -15,9 +15,7 @@ class Pop3Server(
 ) {
     suspend fun listen() = supervisorScope {
         while (isActive) {
-            println("waiting for pop3 socket")
             val transport = Pop3ServerTransport(socket.accept())
-            println("got a pop3 socket: $isActive")
 
             launch {
                 logger.debug { "Accepted a connection from ${transport.remote}." }

@@ -7,6 +7,7 @@ import io.ktor.network.tls.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import java.util.concurrent.Future
+import javax.net.ssl.SSLContext
 
 suspend fun main(): Unit = coroutineScope {
     dns()

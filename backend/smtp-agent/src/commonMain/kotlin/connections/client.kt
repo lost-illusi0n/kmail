@@ -116,9 +116,6 @@ class SecureObjective(override val client: ClientConnection, requiresEncryption:
 
         client.recv()
 
-        // TODO: why?????
-//        println("skipped ${client.transport.connection.value.reader.discard(Int.MAX_VALUE)}")
-
         logger.debug { "Starting TLS negotiations. ${System.currentTimeMillis()}" }
         client.transport.secure()
         logger.debug { "Upgraded connection to TLS. ${System.currentTimeMillis()}"}

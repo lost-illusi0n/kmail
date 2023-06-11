@@ -37,7 +37,7 @@ suspend fun transfer(
 
     val receiveServer = TransferReceiveServer(
         serverFactory.bind(Config.smtp.transfer.port),
-        TransferReceiveConfig(Config.domains.first(), requiresEncryption = true),
+        TransferReceiveConfig(Config.domains.first(), requiresEncryption = true, Config.accounts.map { it.email }),
         incomingMessages
     )
 
