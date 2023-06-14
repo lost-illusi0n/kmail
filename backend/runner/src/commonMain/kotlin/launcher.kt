@@ -1,5 +1,6 @@
 package dev.sitar.kmail.runner
 
+import dev.sitar.kmail.runner.storage.storage
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.connection.ConnectionFactory
 import dev.sitar.kmail.utils.server.ServerSocketFactory
@@ -18,8 +19,7 @@ suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: Con
         val incoming = MutableSharedFlow<InternetMessage>()
         val outgoing = MutableSharedFlow<InternetMessage>()
 
-        val storage = KmailInMemoryStorageLayer()
-        launch { storage(storage, incoming) }
+        val storage = storage(incoming)
         if (Config.pop3.enabled) launch { pop3(serverSocketFactory, KmailPop3Layer(storage)) }
         if (Config.smtp.submission.enabled) launch { submission(serverSocketFactory, outgoing) }
         if (Config.smtp.transfer.enabled) launch { transfer(serverSocketFactory, connectionFactory, outgoing, incoming) }

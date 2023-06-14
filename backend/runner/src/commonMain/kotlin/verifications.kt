@@ -22,5 +22,9 @@ suspend fun dns() {
         dnsResolver.resolveRecursively(it.asString()) {
             qType = ResourceType.TXT
         }.also { logger.info { it } }
+
+        dnsResolver.resolveRecursively(it.asString()) {
+            qType = ResourceType.A
+        }.also { logger.info { it } }
     }
 }

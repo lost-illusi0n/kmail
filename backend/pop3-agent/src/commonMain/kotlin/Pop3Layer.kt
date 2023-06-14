@@ -9,11 +9,11 @@ interface Pop3Layer {
 interface Pop3Maildrop {
     val messages: List<Pop3Message>
 
-    val messageCount: Int get() = messages.size
-    val dropSize: Int get() = messages.sumOf { it.size }
-
     fun commit()
 }
+
+val Pop3Maildrop.messageCount: Int get() = messages.size
+val Pop3Maildrop.dropSize: Int get() = messages.sumOf { it.size }
 
 interface Pop3Message {
     val size: Int
