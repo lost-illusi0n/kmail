@@ -1,5 +1,5 @@
 
-rootProject.name = "kmail"
+rootProject.name = "kmail-mailserver"
 
 include("pop3")
 include("imap")
