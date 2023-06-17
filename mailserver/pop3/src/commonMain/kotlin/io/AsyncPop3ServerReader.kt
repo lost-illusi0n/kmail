@@ -23,12 +23,8 @@ class AsyncPop3ServerReader(reader: AsyncReader): AsyncReader by reader {
     }
 
     suspend fun readCommand(): Pop3Command {
-        val name = Pop3CommandName.fromName(readCommandName())
-
-        if (name == null) {
-            readUtf8UntilLineEnd()
-            return UnknownCommand
-        }
+        val raw = readCommandName()
+        val name = Pop3CommandName.fromName(raw) ?: return UnknownCommand("$raw|${readUtf8UntilLineEnd()}")
 
         return name.deserializer.deserialize(this)
     }

@@ -1,6 +1,6 @@
 package dev.sitar.kmail.agents.smtp.transfer
 
-import dev.sitar.dns.dnsResolver
+import dev.sitar.dns.Dns
 import dev.sitar.dns.records.MXResourceRecord
 import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
@@ -19,9 +19,8 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-private val resolver = dnsResolver()
-
 private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
+private val dns = Dns(defaultServers = GOOGLE_DNS)
 
 data class TransferConfig(
     val domain: Domain,
@@ -62,7 +61,7 @@ class TransferSendAgent(
                 // TODO: resolving lib?
                 if (host.contentEquals("localhost")) return listOf("localhost")
 
-                resolver.resolveRecursively(host, GOOGLE_DNS) { qType = ResourceType.MX }
+                dns.resolveRecursively(host) { qType = ResourceType.MX }
                     ?.filterIsInstance<MXResourceRecord>()
                     ?.sortedBy { it.data.preference }
                     ?.map { it.data.exchange }
