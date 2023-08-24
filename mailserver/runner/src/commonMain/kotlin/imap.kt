@@ -2,43 +2,67 @@ package dev.sitar.kmail.runner
 
 import dev.sitar.kmail.imap.PartSpecifier
 import dev.sitar.kmail.imap.Sequence
-import dev.sitar.kmail.imap.agent.ImapFolder
-import dev.sitar.kmail.imap.agent.ImapQueryAgent
-import dev.sitar.kmail.imap.agent.ImapServer
-import dev.sitar.kmail.imap.agent.SelectedMailbox
-import dev.sitar.kmail.imap.agent.transports.ImapServerTransportClient
+import dev.sitar.kmail.imap.agent.*
 import dev.sitar.kmail.imap.frames.DataItem
-import dev.sitar.kmail.imap.frames.response.FlagsResponse
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.message.headers.from
 import dev.sitar.kmail.message.headers.messageId
 import dev.sitar.kmail.message.headers.subject
 import dev.sitar.kmail.message.headers.toRcpt
 import dev.sitar.kmail.message.message
+import dev.sitar.kmail.runner.storage.UserDirectoryStorageLayer
+import dev.sitar.kmail.runner.storage.StorageLayer
+import dev.sitar.kmail.utils.server.ServerSocketFactory
 import io.ktor.util.*
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import mu.KotlinLogging
-import kotlin.coroutines.coroutineContext
 import kotlin.random.Random
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun imapServer(client: ImapServerTransportClient): ImapServer {
+suspend fun imapServer(socket: ServerSocketFactory, layer: ImapLayer): ImapServer = coroutineScope {
     logger.info("Starting IMAP server.")
-    val server = ImapServer(client.bind(), KmailImapQueryAgent, coroutineContext)
-    server.listen()
+
+    val server = ImapServer(socket.bind(143), layer)
+    launch { server.listen() }
+
     logger.info("Started IMAP server.")
-    return server
+    server
 }
 
-object KmailImapQueryAgent: ImapQueryAgent {
-    override fun select(mailbox: String): SelectedMailbox {
-        return SelectedMailbox(
-            FlagsResponse.SYSTEM_FLAGS, 11, 2, 123, 20
-        )
+class KmailImapMailbox(val mailbox: UserDirectoryStorageLayer): ImapMailbox {
+    override val name: String = mailbox.name
+
+    override val flags: Set<String> = setOf("\\Seen", "\\Answered", "\\Flagged", "\\Deleted", "\\Draft")
+
+    override val exists: Int
+        get() = mailbox.messages().size
+
+    override val recent: Int
+        get() = 0
+    override val uidValidity: Int
+        get() = 0
+    override val uidNext: Int
+        get() = 0
+}
+
+class KmailImapLayer(val storage: StorageLayer): ImapLayer {
+    override suspend fun create(username: String, mailbox: String) {
+        storage.user(mailbox).mailbox(mailbox)
+        println("creating a mailbox called $mailbox")
     }
 
-    override fun create(mailbox: String) {
-        println("creating a mailbox called $mailbox")
+    override suspend fun login(username: String, password: String): Boolean {
+        return Config.accounts.any { it.username.contentEquals(username) && it.password.contentEquals(password) }
+    }
+
+    override suspend fun select(username: String, mailbox: String): ImapMailbox {
+        return KmailImapMailbox(storage.user(username).mailbox(mailbox))
+    }
+
+    override suspend fun mailboxes(username: String): List<ImapMailbox> {
+        return storage.user(username).mailboxes().map { KmailImapMailbox(it) }
     }
 
     override fun listFolders(referenceName: String, forMailbox: String): List<ImapFolder> {

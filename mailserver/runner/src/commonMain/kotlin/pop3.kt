@@ -2,8 +2,9 @@ package dev.sitar.kmail.runner
 
 import dev.sitar.kmail.agents.pop3.*
 import dev.sitar.kmail.message.Message
+import dev.sitar.kmail.runner.storage.UserDirectoryStorageLayer
 import dev.sitar.kmail.runner.storage.StorageLayer
-import dev.sitar.kmail.runner.storage.UserStorageLayer
+import dev.sitar.kmail.runner.storage.asPop3StorageLayer
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -32,7 +33,8 @@ class KmailPop3Layer(val storage: StorageLayer): Pop3Layer {
     }
 
     override suspend fun maildrop(user: String): Pop3Maildrop {
-        return KmailPop3Maildrop(storage.user(user))
+        val user = storage.user(user).asPop3StorageLayer()
+        return KmailPop3Maildrop(user.mailbox())
     }
 }
 
@@ -51,7 +53,7 @@ class KmailInMemoryPop3Message(val message: Message): Pop3Message {
     }
 }
 
-class KmailPop3Maildrop(private val storage: UserStorageLayer): Pop3Maildrop {
+class KmailPop3Maildrop(private val storage: UserDirectoryStorageLayer): Pop3Maildrop {
     override val messages: List<KmailInMemoryPop3Message> = storage.messages().map { KmailInMemoryPop3Message(it) }
 
     override fun commit() {

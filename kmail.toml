@@ -8,6 +8,10 @@ domains = ["xgophers.com"]
 certificatePaths = ["certs/xgophers.crt"]
 certificateKeys = ["certs/private.pem"]
 
+[mailbox]
+format = "mailbox"
+dir = "mail"
+
 [imap]
 enabled = false
 

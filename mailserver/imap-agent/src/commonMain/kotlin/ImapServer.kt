@@ -1,6 +1,7 @@
 package dev.sitar.kmail.imap.agent
 
 import dev.sitar.kmail.imap.agent.transports.ImapServerTransport
+import dev.sitar.kmail.utils.server.ServerSocket
 import kotlinx.coroutines.*
 import mu.KotlinLogging
 import kotlin.coroutines.CoroutineContext
@@ -9,20 +10,17 @@ import kotlin.coroutines.EmptyCoroutineContext
 private val logger = KotlinLogging.logger { }
 
 class ImapServer(
-    val transport: ImapServerTransport,
-    val imapQueryAgent: ImapQueryAgent,
-    coroutineContext: CoroutineContext = EmptyCoroutineContext
+    val socket: ServerSocket,
+    val layer: ImapLayer
 ) {
-    private val scope = CoroutineScope(CoroutineName("imap-server") + SupervisorJob() + coroutineContext)
+    suspend fun listen() = supervisorScope {
+        while (isActive) {
+            val transport = ImapServerTransport(socket.accept())
 
-    fun listen() {
-        scope.launch {
-            while (isActive) {
-                val clientTransport = transport.accept()
-                logger.debug { "Accepted a connection from ${clientTransport.remote}" }
-                launch {
-                    ImapAgent(clientTransport, imapQueryAgent, coroutineContext)
-                }
+            launch {
+                logger.debug { "Accepted a connection from ${transport.remote}" }
+
+                ImapAgent(transport, layer)
             }
         }
     }

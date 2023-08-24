@@ -37,14 +37,12 @@ data class KmailConfig(
 //    val accounts: List<Account>, // TODO: maybe dont hardcode accounts in a config
     val proxy: Proxy? = null,
 //    val storage: Storage,
+    val mailbox: Mailbox,
     val security: Security,
     val smtp: Smtp,
     val imap: Imap,
     val pop3: Pop3,
 ) {
-    // TODO: fix ktoml?
-    val storage: Storage = Storage.FileSystemStorage(dir = "mail")
-
 //    TODO: https://github.com/akuleshov7/ktoml/issues/99
 //    @Serializable
 //    data class Security(
@@ -102,14 +100,10 @@ data class KmailConfig(
     )
 
     @Serializable
-    sealed interface Storage {
-        @Serializable
-        @SerialName("FileSystem")
-        data class FileSystemStorage(val dir: String): Storage
-
-        @Serializable
-        @SerialName("InMemory")
-        object InMemoryStorage: Storage
+    data class Mailbox(val format: Format, val dir: String) {
+        enum class Format {
+            Maildir
+        }
     }
 }
 

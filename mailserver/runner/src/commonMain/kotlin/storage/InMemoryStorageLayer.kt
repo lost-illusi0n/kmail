@@ -17,6 +17,18 @@ class KmailInMemoryStorageLayer : StorageLayer {
 }
 
 class KmailInMemoryUserStorageLayer : UserStorageLayer {
+    private val mailboxes: MutableList<KmailInMemoryUserDirectoryStorageLayer> = mutableListOf()
+
+    override suspend fun mailbox(name: String?): UserDirectoryStorageLayer {
+        val mailbox = KmailInMemoryUserDirectoryStorageLayer(name ?: "root")
+        mailboxes.add(mailbox)
+        return mailbox
+    }
+
+    override suspend fun mailboxes(): List<UserDirectoryStorageLayer> = mailboxes
+}
+
+class KmailInMemoryUserDirectoryStorageLayer(override val name: String) : UserDirectoryStorageLayer {
     private val messages: Channel<Message> = Channel()
 
     override suspend fun store(message: Message) {

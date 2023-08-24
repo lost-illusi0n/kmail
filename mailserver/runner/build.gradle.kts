@@ -24,6 +24,7 @@ kotlin {
 
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
         implementation(project(":smtp-agent"))
+        implementation(project(":smtp"))
         implementation(project(":imap-agent"))
         implementation(project(":pop3-agent"))
     }

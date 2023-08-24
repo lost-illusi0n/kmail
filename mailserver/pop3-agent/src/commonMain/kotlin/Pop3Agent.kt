@@ -15,7 +15,7 @@ class Pop3Agent(
     val transport: Pop3ServerTransport,
     val layer: Pop3Layer
 ) {
-    var state: State = State.Authorization(this@Pop3Agent)
+    var state: State = State.Authorization(this)
 
     suspend fun handle() = coroutineScope {
         launch { transport.startPipeline() }
