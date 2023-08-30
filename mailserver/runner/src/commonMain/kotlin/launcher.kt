@@ -5,7 +5,7 @@ import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.connection.ConnectionFactory
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -20,6 +20,7 @@ suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: Con
         val outgoing = MutableSharedFlow<InternetMessage>()
 
         val mailbox = mailbox(incoming)
+
         if (Config.pop3.enabled) launch { pop3(serverSocketFactory, KmailPop3Layer(mailbox)) }
         if (Config.smtp.submission.enabled) launch { submission(serverSocketFactory, outgoing) }
         if (Config.smtp.transfer.enabled) launch { transfer(serverSocketFactory, connectionFactory, outgoing, incoming) }

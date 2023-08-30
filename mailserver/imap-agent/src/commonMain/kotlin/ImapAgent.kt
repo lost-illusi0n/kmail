@@ -1,13 +1,14 @@
 package dev.sitar.kmail.imap.agent
 
-import com.ibm.java.diagnostics.utils.commands.QuitCommand
 import dev.sitar.kmail.imap.Capabilities
 import dev.sitar.kmail.imap.agent.transports.ImapServerTransport
 import dev.sitar.kmail.imap.frames.Tag
 import dev.sitar.kmail.imap.frames.command.*
 import dev.sitar.kmail.imap.frames.response.*
-import io.ktor.util.logging.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -47,7 +48,8 @@ class ImapAgent(
                     transport.send(command.tag + OkResponse(text = "noop"))
                 }
 
-                if (command.command is QuitCommand) {
+                if (command.command is LogoutCommand) {
+                    transport.send(Tag.Untagged + ByeResponse(text = "bye."))
                     cancel()
                     transport.connection.close()
                     awaitCancellation()

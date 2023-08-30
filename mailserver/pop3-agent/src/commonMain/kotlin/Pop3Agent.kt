@@ -1,6 +1,7 @@
 package dev.sitar.kmail.agents.pop3
 
 import dev.sitar.kmail.agents.pop3.transports.Pop3ServerTransport
+import dev.sitar.kmail.pop3.Capability
 import dev.sitar.kmail.pop3.commands.*
 import dev.sitar.kmail.pop3.replies.Pop3Reply
 import kotlinx.coroutines.awaitCancellation
@@ -10,6 +11,8 @@ import kotlinx.coroutines.launch
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
+
+private val SUPPORTED_CAPABILITIES = listOf(Capability.Uidl, Capability.User, Capability.Implementation("kmail"))
 
 class Pop3Agent(
     val transport: Pop3ServerTransport,
@@ -28,10 +31,22 @@ class Pop3Agent(
             }
 
             filter(Pop3CommandPipeline.Before) {
-                if (command is UnknownCommand) {
-                    wasProcessed = true
+                wasProcessed = true
 
-                    transport.sendReply(Pop3Reply.ErrReply("unknown command"))
+                when (command) {
+                    is UnknownCommand -> {
+                        transport.sendReply(Pop3Reply.ErrReply("unknown command"))
+                    }
+
+                    is CapaCommand -> {
+                        transport.sendReply(Pop3Reply.OkReply("here is what i support."))
+                        SUPPORTED_CAPABILITIES.forEach { transport.sendReply(Pop3Reply.DataReply(it.value)) }
+                        transport.sendReply(Pop3Reply.DataReply("."))
+                    }
+
+                    else -> {
+                        wasProcessed = false
+                    }
                 }
             }
 
@@ -43,6 +58,7 @@ class Pop3Agent(
                 if (wasProcessed) return@filter
 
                 if (command is QuitCommand) {
+                    transport.sendReply(Pop3Reply.OkReply("bye"))
                     cancel()
                     transport.connection.close()
                     awaitCancellation()
@@ -114,13 +130,27 @@ sealed interface State {
                     agent.transport.sendReply(Pop3Reply.DataReply(message.getContent()))
                     agent.transport.sendReply(Pop3Reply.DataReply("."))
                 }
+
+                is UidlCommand -> {
+                    val message = context.command.msg
+
+                    if (message == null) {
+                        agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount} messages"))
+
+                        repeat(maildrop.messageCount) {
+                            agent.transport.sendReply(Pop3Reply.DataReply("${it + 1} ${maildrop.messages[it].uniqueIdentifier}"))
+                        }
+
+                        agent.transport.sendReply(Pop3Reply.DataReply("."))
+                    } else {
+                        agent.transport.sendReply(Pop3Reply.OkReply("$message ${maildrop.messages[message - 1].uniqueIdentifier}"))
+                    }
+                }
+//                is QuitCommand -> {
+//
+//                }
                 else -> context.wasProcessed = false
             }
-        }
-    }
-    class Update(val agent: Pop3Agent) : State {
-        override suspend fun handle(context: Pop3CommandContext) {
-            TODO("Not yet implemented")
         }
     }
 

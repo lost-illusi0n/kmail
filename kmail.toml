@@ -6,11 +6,18 @@ domains = ["xgophers.com"]
 #    { path = "certs/xgophers.crt", key = "certs/private.key" }
 #]
 certificatePaths = ["certs/xgophers.crt"]
-certificateKeys = ["certs/private.pem"]
+certificateKeys = ["certs/private.der"]
 
 [mailbox]
-format = "mailbox"
+format = "maildir"
+
+[mailbox.filesystem]
+type = "local"
 dir = "mail"
+
+#[mailbox.filesystem]
+#type = "s3"
+#url = "..."
 
 [imap]
 enabled = false

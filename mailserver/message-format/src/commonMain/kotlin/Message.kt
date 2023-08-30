@@ -4,6 +4,7 @@ import dev.sitar.kio.buffers.asBuffer
 import dev.sitar.kmail.message.headers.Header
 import dev.sitar.kmail.message.headers.Headers
 
+// TODO: instead of fully parsing every email and turning it into a typed representation (perhaps with flaws), it could be better to keep the original email string and lazily parse it if needed
 data class Message(
     val headers: Headers,
     val body: String?

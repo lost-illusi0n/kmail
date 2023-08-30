@@ -1,8 +1,8 @@
 package dev.sitar.kmail.agents.smtp.submission
 
-import dev.sitar.kmail.agents.smtp.rewrite.ServerConnection
-import dev.sitar.kmail.agents.smtp.rewrite.ServerExtension
-import dev.sitar.kmail.agents.smtp.rewrite.StartTlsExtension
+import dev.sitar.kmail.agents.smtp.connections.ServerConnection
+import dev.sitar.kmail.agents.smtp.connections.ServerExtension
+import dev.sitar.kmail.agents.smtp.connections.StartTlsExtension
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpCommandPipeline
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.smtp.AuthenticationCommand

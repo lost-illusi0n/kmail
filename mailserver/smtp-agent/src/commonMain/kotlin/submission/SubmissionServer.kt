@@ -3,14 +3,11 @@ package dev.sitar.kmail.agents.smtp.submission
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.server.ServerSocket
-import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import mu.KotlinLogging
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 
 private val logger = KotlinLogging.logger { }
 

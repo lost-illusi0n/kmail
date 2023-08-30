@@ -1,7 +1,6 @@
 package dev.sitar.kmail.runner
 
 import com.akuleshov7.ktoml.TomlInputConfig
-import com.akuleshov7.ktoml.file.TomlFileReader
 import com.akuleshov7.ktoml.source.TomlSourceReader
 import dev.sitar.kmail.agents.smtp.transfer.Proxy
 import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
@@ -52,7 +51,7 @@ data class KmailConfig(
 //        data class CertificateAndKey(val certificate: String, val key: String)
 //    }
     // TODO: wait for issue99 to be fixed
-    val accounts = listOf(Account("catlover69", "password1234", "marco@localhost"))
+val accounts = listOf(Account("catlover69", "password1234", "marco@storm.sitar.dev"))
 
     @Serializable
     data class Account(
@@ -60,6 +59,32 @@ data class KmailConfig(
         val password: String, // TODO: lol plaintext password
         val email: String
     )
+
+    @Serializable
+    data class Mailbox(
+        val format: Format,
+        val filesystem: Filesystem
+    ) {
+        @Serializable
+        enum class Format {
+            @SerialName("maildir")
+            Maildir
+        }
+
+        @Serializable
+        data class Filesystem(
+            val type: String,
+            val dir: String
+        )
+
+        // TODO: ktoml serialization again
+//        @Serializable
+//        sealed interface Filesystem {
+//            @Serializable
+//            @SerialName("local")
+//            data class Local(val dir: String): Filesystem
+//        }
+    }
 
     @Serializable
     data class Proxy(
@@ -98,13 +123,6 @@ data class KmailConfig(
     data class Pop3(
         val enabled: Boolean
     )
-
-    @Serializable
-    data class Mailbox(val format: Format, val dir: String) {
-        enum class Format {
-            Maildir
-        }
-    }
 }
 
 val Config: KmailConfig = TomlSourceReader(TomlInputConfig(ignoreUnknownNames = true)).decodeFromString(KmailConfig.serializer(), File("kmail.toml").readLines())

@@ -6,10 +6,10 @@ import dev.sitar.dns.records.ResourceType
 import dev.sitar.dns.transports.DnsServer
 import dev.sitar.kmail.agents.smtp.DefaultTransferSessionSmtpConnector
 import dev.sitar.kmail.agents.smtp.SmtpServerConnector
-import dev.sitar.kmail.agents.smtp.rewrite.ClientConnection
-import dev.sitar.kmail.agents.smtp.rewrite.ClientObjective
-import dev.sitar.kmail.agents.smtp.rewrite.MailObjective
-import dev.sitar.kmail.agents.smtp.rewrite.SecureObjective
+import dev.sitar.kmail.agents.smtp.connections.ClientConnection
+import dev.sitar.kmail.agents.smtp.connections.ClientObjective
+import dev.sitar.kmail.agents.smtp.connections.MailObjective
+import dev.sitar.kmail.agents.smtp.connections.SecureObjective
 import dev.sitar.kmail.agents.smtp.transports.client.SmtpClientTransport
 import dev.sitar.kmail.smtp.Domain
 import dev.sitar.kmail.smtp.InternetMessage
@@ -19,8 +19,9 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
-private val dns = Dns(defaultServers = GOOGLE_DNS)
+//private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
+//private val dns = Dns(defaultServers = GOOGLE_DNS)
+private val dns = Dns(defaultServers = listOf(DnsServer("192.168.1.1")))
 
 data class TransferConfig(
     val domain: Domain,

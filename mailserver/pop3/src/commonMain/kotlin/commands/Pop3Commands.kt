@@ -66,3 +66,18 @@ data class PassCommand(val password: String) : Pop3Command {
         }
     }
 }
+
+object CapaCommand : Pop3Command {
+    object Deserializer : Pop3CommandDeserializer<CapaCommand> by NoneArgumentPop3CommandDeserializer(CapaCommand)
+}
+
+data class UidlCommand(val msg: Int?) : Pop3Command {
+    object Deserializer : Pop3CommandDeserializer<UidlCommand> {
+        override suspend fun deserialize(reader: AsyncReader): UidlCommand {
+            return when (val content = reader.readUtf8UntilLineEnd()) {
+                "" -> UidlCommand(null)
+                else -> UidlCommand(content.drop(1).toInt())
+            }
+        }
+    }
+}

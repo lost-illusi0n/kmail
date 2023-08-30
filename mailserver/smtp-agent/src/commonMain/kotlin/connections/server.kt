@@ -1,9 +1,6 @@
-package dev.sitar.kmail.agents.smtp.rewrite
+package dev.sitar.kmail.agents.smtp.connections
 
-import dev.sitar.kio.async.readers.readBytes
 import dev.sitar.kmail.agents.smtp.queueId
-import dev.sitar.kmail.agents.smtp.transfer.TransferReceiveAgent
-import dev.sitar.kmail.agents.smtp.transfer.TransferReceiveServer
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpCommandPipeline
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.message.Message

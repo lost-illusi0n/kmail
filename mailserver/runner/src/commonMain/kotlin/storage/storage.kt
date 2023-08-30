@@ -10,17 +10,17 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import java.io.File
 
 fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLayer {
-    val storage = KmailFileSystemStorageLayer(Config.mailbox.dir)
+    require(Config.mailbox.filesystem.type.contentEquals("local"))
+    val storage = KmailFileSystemStorageLayer(Config.mailbox.filesystem.dir)
 //    val mailbox = when (Config.mailbox.format) {
 //        KmailConfig.Mailbox.Format.Maildir -> Maildir(File(Config.mailbox.dir).also { it.mkdir() })
 //    }
 
     launch {
         incoming.filterSpam().mapToAccount().onEach { (account, message) ->
-            storage.user(account.username).directory(null).store(message.message)
+            storage.user(account.username).store(message.message)
         }.launchIn(this)
     }
 

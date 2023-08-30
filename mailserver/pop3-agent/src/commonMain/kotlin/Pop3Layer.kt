@@ -16,8 +16,13 @@ val Pop3Maildrop.messageCount: Int get() = messages.size
 val Pop3Maildrop.dropSize: Int get() = messages.sumOf { it.size }
 
 interface Pop3Message {
+    val uniqueIdentifier: String
+
     val size: Int
+
     val deleted: Boolean
+
     fun getContent(): String
+
     fun delete()
 }

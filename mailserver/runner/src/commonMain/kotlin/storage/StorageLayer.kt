@@ -1,5 +1,5 @@
 package dev.sitar.kmail.runner.storage
 
 interface StorageLayer {
-    suspend fun user(username: String): UserStorageLayer
+    suspend fun user(username: String): Mailbox
 }

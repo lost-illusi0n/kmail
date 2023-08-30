@@ -1,4 +1,4 @@
-package dev.sitar.kmail.agents.smtp.rewrite
+package dev.sitar.kmail.agents.smtp.connections
 
 import dev.sitar.kmail.agents.smtp.transports.client.SmtpClientTransport
 import dev.sitar.kmail.smtp.*

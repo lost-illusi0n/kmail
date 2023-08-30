@@ -14,13 +14,6 @@ include("runner")
 
 include("utils")
 
-// TODO: publish dnskotlin
-includeBuild("../../dnskotlin") {
-    dependencySubstitution {
-        substitute(module("dev.sitar:dnskotlin")).using(project(":"))
-    }
-}
-
 // TODO: publish latest kio
 includeBuild("../../kio") {
     dependencySubstitution {

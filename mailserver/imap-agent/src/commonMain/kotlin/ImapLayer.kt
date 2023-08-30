@@ -10,8 +10,6 @@ interface ImapLayer {
 
     suspend fun create(username: String, mailbox: String)
 
-    suspend fun mailboxes(username: String): List<ImapMailbox>
-
     fun listFolders(referenceName: String, forMailbox: String): List<ImapFolder>
 
     fun listSubscribedFolders(referenceName: String, forMailbox: String): List<ImapFolder>

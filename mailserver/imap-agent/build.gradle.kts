@@ -19,6 +19,6 @@ kotlin {
         implementation("dev.sitar:keystone")
         implementation("io.ktor:ktor-network:2.1.3")
         implementation("io.ktor:ktor-network-tls:2.1.3")
-        implementation("dev.sitar:dnskotlin:0.0.1")
+        implementation("dev.sitar:dnskotlin:0.2.1")
     }
 }

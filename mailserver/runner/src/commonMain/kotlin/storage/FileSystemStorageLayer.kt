@@ -1,11 +1,14 @@
 package dev.sitar.kmail.runner.storage
 
 import dev.sitar.kmail.message.Message
+import dev.sitar.kmail.runner.Config
+import dev.sitar.kmail.runner.KmailConfig
 import io.ktor.util.date.*
 import java.io.File
 import java.io.FileFilter
 
 // TODO: replace this with a mpp solution
+// TODO: replace this with the abstracted filesystem solution
 class KmailFileSystemStorageLayer(rootDir: String) : StorageLayer {
     private val root = File(rootDir)
 
@@ -13,10 +16,13 @@ class KmailFileSystemStorageLayer(rootDir: String) : StorageLayer {
         root.mkdir()
     }
 
-    override suspend fun user(username: String): UserStorageLayer {
+    override suspend fun user(username: String): Mailbox {
         val user = root.resolve(username)
         user.mkdir()
-        return KmailFileSystemUserStorageLayer(user)
+
+        return when (Config.mailbox.format) {
+            KmailConfig.Mailbox.Format.Maildir -> Maildir(user)
+        }
     }
 }
 
@@ -41,13 +47,11 @@ class KmailFileSystemUserDirectoryStorageLayer(val mailbox: File) : UserDirector
 }
 
 class KmailFileSystemUserStorageLayer(val user: File) : UserStorageLayer {
-    override suspend fun mailbox(name: String?): UserDirectoryStorageLayer {
-        if (name == null) return KmailFileSystemUserDirectoryStorageLayer(user)
-
+    override suspend fun directory(name: String): UserDirectoryStorageLayer {
         return KmailFileSystemUserDirectoryStorageLayer(user.resolve(name))
     }
 
-    override suspend fun mailboxes(): List<UserDirectoryStorageLayer> {
-        return user.listFiles()!!.filter { it.isDirectory }.map { KmailFileSystemUserDirectoryStorageLayer(it) }
-    }
+//    override suspend fun directories(): List<UserDirectoryStorageLayer> {
+//        return user.listFiles()!!.filter { it.isDirectory }.map { KmailFileSystemUserDirectoryStorageLayer(it) }
+//    }
 }

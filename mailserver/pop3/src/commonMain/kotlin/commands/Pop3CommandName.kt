@@ -9,10 +9,11 @@ enum class Pop3CommandName(val deserializer: Pop3CommandDeserializer<*>) {
     Noop(NoopCommand.Deserializer),
     User(UserCommand.Deserializer),
     Rset(RsetCommand.Deserializer),
-    Pass(PassCommand.Deserializer);
+    Pass(PassCommand.Deserializer),
+    Uidl(UidlCommand.Deserializer),
+    Capa(CapaCommand.Deserializer);
     // optional
 //    Top,
-//    Uidl,
 //    Apop
 
     companion object {

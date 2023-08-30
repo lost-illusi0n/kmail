@@ -2,7 +2,10 @@ package dev.sitar.kmail.runner
 
 import dev.sitar.kmail.imap.PartSpecifier
 import dev.sitar.kmail.imap.Sequence
-import dev.sitar.kmail.imap.agent.*
+import dev.sitar.kmail.imap.agent.ImapFolder
+import dev.sitar.kmail.imap.agent.ImapLayer
+import dev.sitar.kmail.imap.agent.ImapMailbox
+import dev.sitar.kmail.imap.agent.ImapServer
 import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.message.headers.from
@@ -10,7 +13,7 @@ import dev.sitar.kmail.message.headers.messageId
 import dev.sitar.kmail.message.headers.subject
 import dev.sitar.kmail.message.headers.toRcpt
 import dev.sitar.kmail.message.message
-import dev.sitar.kmail.runner.storage.UserDirectoryStorageLayer
+import dev.sitar.kmail.runner.storage.MailboxFolder
 import dev.sitar.kmail.runner.storage.StorageLayer
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import io.ktor.util.*
@@ -31,7 +34,7 @@ suspend fun imapServer(socket: ServerSocketFactory, layer: ImapLayer): ImapServe
     server
 }
 
-class KmailImapMailbox(val mailbox: UserDirectoryStorageLayer): ImapMailbox {
+class KmailImapMailbox(val mailbox: MailboxFolder) : ImapMailbox {
     override val name: String = mailbox.name
 
     override val flags: Set<String> = setOf("\\Seen", "\\Answered", "\\Flagged", "\\Deleted", "\\Draft")
@@ -48,9 +51,9 @@ class KmailImapMailbox(val mailbox: UserDirectoryStorageLayer): ImapMailbox {
 }
 
 class KmailImapLayer(val storage: StorageLayer): ImapLayer {
-    override suspend fun create(username: String, mailbox: String) {
-        storage.user(mailbox).mailbox(mailbox)
-        println("creating a mailbox called $mailbox")
+    override suspend fun create(username: String, folder: String) {
+        storage.user(username).folder(folder)
+        println("creating a mailbox called $folder")
     }
 
     override suspend fun login(username: String, password: String): Boolean {
@@ -58,11 +61,7 @@ class KmailImapLayer(val storage: StorageLayer): ImapLayer {
     }
 
     override suspend fun select(username: String, mailbox: String): ImapMailbox {
-        return KmailImapMailbox(storage.user(username).mailbox(mailbox))
-    }
-
-    override suspend fun mailboxes(username: String): List<ImapMailbox> {
-        return storage.user(username).mailboxes().map { KmailImapMailbox(it) }
+        return KmailImapMailbox(storage.user(username).folder(mailbox))
     }
 
     override fun listFolders(referenceName: String, forMailbox: String): List<ImapFolder> {
