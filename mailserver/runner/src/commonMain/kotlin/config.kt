@@ -1,38 +1,28 @@
 package dev.sitar.kmail.runner
 
-import com.akuleshov7.ktoml.TomlInputConfig
-import com.akuleshov7.ktoml.source.TomlSourceReader
-import dev.sitar.kmail.agents.smtp.transfer.Proxy
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonTypeInfo
+import com.fasterxml.jackson.annotation.JsonTypeName
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.databind.DeserializationContext
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer
+import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.dataformat.toml.TomlMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
 import dev.sitar.kmail.agents.smtp.transports.SMTP_TRANSFER_PORT
 import dev.sitar.kmail.smtp.Domain
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Serializer
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import java.io.File
 
-@Serializer(forClass = Domain::class)
-object DomainSerializer: KSerializer<Domain> {
-    override val descriptor: SerialDescriptor
-        get() = String.serializer().descriptor
-
-    override fun deserialize(decoder: Decoder): Domain {
-        return Domain.fromText(decoder.decodeString())!!
-    }
-
-    override fun serialize(encoder: Encoder, value: Domain) {
-        encoder.encodeString(value.asString())
+object DomainSerializer : StdDeserializer<Domain>(Domain::class.java) {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): Domain {
+        return Domain.fromText(p.valueAsString)!!
     }
 }
 
-@Serializable
+//@Serializable
 data class KmailConfig(
-    val domains: List<@Serializable(with = DomainSerializer::class) Domain>,
+    val domains: List<Domain>,
 //    val accounts: List<Account>, // TODO: maybe dont hardcode accounts in a config
     val proxy: Proxy? = null,
 //    val storage: Storage,
@@ -42,51 +32,31 @@ data class KmailConfig(
     val imap: Imap,
     val pop3: Pop3,
 ) {
-//    TODO: https://github.com/akuleshov7/ktoml/issues/99
-//    @Serializable
-//    data class Security(
-//        val certificates: List<CertificateAndKey>,
-//    ) {
-//        @Serializable
-//        data class CertificateAndKey(val certificate: String, val key: String)
-//    }
     // TODO: wait for issue99 to be fixed
-val accounts = listOf(Account("catlover69", "password1234", "marco@storm.sitar.dev"))
+    val accounts = listOf(Account("catlover69", "password1234", "marco@storm.sitar.dev"))
 
-    @Serializable
     data class Account(
         val username: String,
         val password: String, // TODO: lol plaintext password
         val email: String
     )
 
-    @Serializable
     data class Mailbox(
         val format: Format,
         val filesystem: Filesystem
     ) {
-        @Serializable
         enum class Format {
-            @SerialName("maildir")
+            @JsonProperty("maildir")
             Maildir
         }
 
-        @Serializable
-        data class Filesystem(
-            val type: String,
-            val dir: String
-        )
-
-        // TODO: ktoml serialization again
-//        @Serializable
-//        sealed interface Filesystem {
-//            @Serializable
-//            @SerialName("local")
-//            data class Local(val dir: String): Filesystem
-//        }
+        @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
+        sealed interface Filesystem {
+            @JsonTypeName("local")
+            data class Local(val dir: String): Filesystem
+        }
     }
 
-    @Serializable
     data class Proxy(
         val ip: String,
         val port: Int
@@ -97,32 +67,24 @@ val accounts = listOf(Account("catlover69", "password1234", "marco@storm.sitar.d
         }
     }
 
-    @Serializable
-    data class Security(
-        val certificatePaths: List<String>,
-        val certificateKeys: List<String>
-    )
-
-    @Serializable
+    data class Security(val certificates: List<CertificateAndKey>) {
+        data class CertificateAndKey(val certificate: String, val key: String)
+    }
     data class Smtp(
         val submission: Submission,
         val transfer: Transfer
     ) {
-        @Serializable
         data class Submission(val enabled: Boolean, val port: Int = SMTP_SUBMISSION_PORT)
-        @Serializable
         data class Transfer(val enabled: Boolean, val encryption: Boolean = true, val port: Int = SMTP_TRANSFER_PORT)
     }
 
-    @Serializable
     data class Imap(
         val enabled: Boolean
     )
 
-    @Serializable
     data class Pop3(
         val enabled: Boolean
     )
 }
 
-val Config: KmailConfig = TomlSourceReader(TomlInputConfig(ignoreUnknownNames = true)).decodeFromString(KmailConfig.serializer(), File("kmail.toml").readLines())
+val Config: KmailConfig = TomlMapper().registerKotlinModule().registerModule(SimpleModule().addDeserializer(Domain::class.java, DomainSerializer)).readValue(File("kmail.toml"), KmailConfig::class.java)

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLayer {
-    require(Config.mailbox.filesystem.type.contentEquals("local"))
+    require(Config.mailbox.filesystem is KmailConfig.Mailbox.Filesystem.Local)
     val storage = KmailFileSystemStorageLayer(Config.mailbox.filesystem.dir)
 //    val mailbox = when (Config.mailbox.format) {
 //        KmailConfig.Mailbox.Format.Maildir -> Maildir(File(Config.mailbox.dir).also { it.mkdir() })

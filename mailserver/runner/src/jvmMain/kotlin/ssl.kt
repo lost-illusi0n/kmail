@@ -37,11 +37,7 @@ fun ssl(): Pair<SSLContext, KeyStore> {
     val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
     keyStore.load(null)
 
-    Config.security.certificatePaths.forEachIndexed { i, certPath ->
-        logger.debug { "Loading certificates for $certPath." }
-
-        val keyPath = Config.security.certificateKeys[i]
-
+    Config.security.certificates.forEach { (certPath, key) ->
         FileInputStream(certPath).use { certStream ->
             certStream.load().apply {
                 forEachIndexed { i, cert ->
@@ -50,7 +46,7 @@ fun ssl(): Pair<SSLContext, KeyStore> {
 
                 keyStore.setKeyEntry("private",
                     KeyFactory.getInstance("RSA")
-                        .generatePrivate(PKCS8EncodedKeySpec(FileInputStream(keyPath).readAllBytes())),
+                        .generatePrivate(PKCS8EncodedKeySpec(FileInputStream(key).readAllBytes())),
                     null,
                     this
                 )

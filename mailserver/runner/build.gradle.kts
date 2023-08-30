@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
@@ -5,6 +8,10 @@ plugins {
 
 repositories {
     mavenCentral()
+
+    maven {
+        url = uri("https://jitpack.io")
+    }
 }
 
 kotlin {
@@ -18,9 +25,8 @@ kotlin {
 
         implementation("io.ktor:ktor-network-tls-certificates:2.1.3")
 
-        implementation("com.akuleshov7:ktoml-core:0.5.0")
-        implementation("com.akuleshov7:ktoml-file:0.5.0")
-        implementation("com.akuleshov7:ktoml-source:0.5.0")
+        implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.15.2")
+        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
 
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
         implementation(project(":smtp-agent"))
