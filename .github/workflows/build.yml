@@ -1,0 +1,24 @@
+name: Kotlin CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+jobs:
+  build:
+    name: Build mailserver
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+      - name: Build with Gradle
+        uses: gradle/gradle-build-action@v2
+        with:
+          build-root-directory: ./mailserver
+          arguments: --stacktrace --info build
