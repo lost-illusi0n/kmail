@@ -16,13 +16,6 @@ include("runner")
 
 include("utils")
 
-// TODO: publish latest kio
-includeBuild("../../kio") {
-    dependencySubstitution {
-        substitute(module("dev.sitar:kio:1.1.1")).using(project(":"))
-    }
-}
-
 // TODO: publish keystone
 includeBuild("../../keystone") {
     dependencySubstitution {
