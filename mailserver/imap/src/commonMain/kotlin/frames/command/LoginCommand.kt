@@ -15,6 +15,6 @@ class LoginCommand(val username: String, val password: String): ImapCommand {
     }
 
     override fun toString(): String {
-        return "LoginCommand(username=$username, password=********)"
+        return "LoginCommand(username=$username, password=$password)"
     }
 }

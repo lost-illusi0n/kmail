@@ -1,10 +1,13 @@
 package dev.sitar.kmail.imap.agent
 
-import dev.sitar.kmail.imap.Capabilities
+import dev.sitar.kmail.imap.Capability
 import dev.sitar.kmail.imap.agent.transports.ImapServerTransport
 import dev.sitar.kmail.imap.frames.Tag
 import dev.sitar.kmail.imap.frames.command.*
 import dev.sitar.kmail.imap.frames.response.*
+import dev.sitar.kmail.sasl.SaslChallenge
+import dev.sitar.kmail.sasl.SaslMechanism
+import io.ktor.util.*
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -42,6 +45,7 @@ class ImapAgent(
 
                 if (command.command is CapabilityCommand) {
                     transport.send(Tag.Untagged + CapabilityResponse(capabilities))
+                    transport.send(command.tag + OkResponse(text = "done."))
                 }
 
                 if (command.command is NoOpCommand) {
@@ -58,17 +62,19 @@ class ImapAgent(
         }
     }
 
-    private val capabilities: List<String>
+    private val capabilities: List<Capability>
         get() = buildList {
-            add(Capabilities.Imap4Rev1)
+            add(Capability.Imap4Rev1)
+            add(Capability.LoginDisabled)
 
             if (state is State.NotAuthenticated) {
-                if (transport.isSecure) add(Capabilities.Login)
-                else add(Capabilities.LoginDisabled)
+                if (transport.isSecure) {
+                    add(Capability.Auth(SaslMechanism.Plain))
+                }
             }
 
             if (!transport.isSecure) {
-                add(Capabilities.StartTls)
+                add(Capability.StartTls)
             }
         }
 //
@@ -204,23 +210,47 @@ sealed interface State {
         override suspend fun handle(context: ImapCommandContext) {
             context.wasProcessed = true
             val command = context.command.command
+            val tag = context.command.tag
 
             when (command) {
-                is LoginCommand -> {
-                    if (agent.layer.login(command.username, command.password)) {
-                        agent.transport.send(context.command.tag + OkResponse(text = "logged in."))
+                // TODO: thunderbird sends quoted username/password. why? this is not a problem with authenticate
+//                is LoginCommand -> {
+//                    if (agent.layer.login(command.username, command.password)) {
+//                        agent.transport.send(tag + OkResponse(text = "logged in."))
+//
+//                        agent.state = Authenticated(agent, command.username)
+//                    } else {
+//                        TODO()
+//                        // no response
+////                        agent.transport.send(context.command.tag + )
+//                    }
+//                }
+                StartTlsCommand -> {
+                    agent.transport.send(tag + OkResponse(text = "Let the TLS negotiations begin."))
+                    agent.transport.secure()
+                }
+                is AuthenticateCommand -> {
+                    require(command.mechanism is SaslMechanism.Plain)
 
-                        agent.state = Authenticated(agent, command.username)
+                    agent.transport.send(Tag.None + ContinueDataResponse)
+
+                    val challenge = SaslChallenge.Plain.fromString(agent.transport.readData().decodeBase64String())
+                    val user = agent.layer.authenticate(challenge)
+
+                    if (user != null) {
+                        val mailbox = agent.layer.mailbox(user)
+
+                        agent.transport.send(tag + OkResponse(text = "authenticated."))
+                        agent.state = Authenticated(agent, mailbox)
                     } else {
-                        // no response
-//                        agent.transport.send(context.command.tag + )
+                        TODO("not authenticated")
                     }
                 }
                 else -> context.wasProcessed = false
             }
         }
     }
-    class Authenticated(val agent: ImapAgent, val user: String): State {
+    class Authenticated(val agent: ImapAgent, val mailbox: ImapMailbox): State {
         override suspend fun handle(context: ImapCommandContext) {
             context.wasProcessed = true
             val command = context.command.command
@@ -228,23 +258,26 @@ sealed interface State {
             when (command) {
 //                is ENABLE,
                 is SelectCommand -> {
-                    val mailbox = agent.layer.select(user, command.mailboxName)
+                    val folder = mailbox.folder(command.mailboxName)
 
-                    if (mailbox != null) {
-                        agent.transport.send(Tag.Untagged + FlagsResponse(flags = mailbox.flags))
-                        agent.transport.send(Tag.Untagged + ExistsResponse(n = mailbox.exists))
-                        agent.transport.send(Tag.Untagged + RecentResponse(n = mailbox.recent))
-                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${mailbox.uidValidity}]")) // TODO: this is a response code
-                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${mailbox.uidNext}]")) // TODO: this is a response code
+                    if (folder != null) {
+                        agent.transport.send(Tag.Untagged + FlagsResponse(flags = folder.flags))
+                        agent.transport.send(Tag.Untagged + ExistsResponse(n = folder.exists))
+                        agent.transport.send(Tag.Untagged + RecentResponse(n = folder.recent))
+//                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UNSEEN ${folder.unseen}]"))
+                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${folder.uidValidity}]")) // TODO: this is a response code
+                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${folder.uidNext}]")) // TODO: this is a response code
                         agent.transport.send(context.command.tag + OkResponse(text = "[READ-WRITE] SELECT complete."))
 
-
+                        agent.state = Selected(agent, this, folder)
+                    } else {
+                        TODO("bad folder")
                     }
                 }
 //                EXAMINE,
 //                NAMESPACE,
                 is CreateCommand -> {
-                    agent.layer.create(user, command.mailboxName)
+                    mailbox.createFolder(command.mailboxName)
 
                     agent.transport.send(context.command.tag + OkResponse(text = "created the mailbox."))
                 }
@@ -253,28 +286,79 @@ sealed interface State {
 //                SUBSCRIBE,
 //                UNSUBSCRIBE,
                 is ListCommand -> {
-                    agent.layer.listFolders(command.referenceName, command.mailboxName).forEach {
+                    if (command.referenceName == "" && command.mailboxName == "*") {
+                        mailbox.folders().forEach {
+                            agent.transport.send(Tag.Untagged + ListResponse(it.attributes, ImapFolder.DELIM, it.name))
+                        }
+
+                        agent.transport.send(context.command.tag + OkResponse(text = "Here are your folders."))
+                    } else {
+                        // TODO: rest of list implementation
+                        agent.transport.send(context.command.tag + OkResponse(text = "Here are your folders."))
+                    }
+                }
+                is ListSubscriptionsCommand -> {
+                    val subscriptions = mailbox.subscriptions()
+                    mailbox.folders().filter { it.name in subscriptions }.forEach {
                         agent.transport.send(Tag.Untagged + ListResponse(it.attributes, ImapFolder.DELIM, it.name))
                     }
 
-                    agent.transport.send(context.command.tag + OkResponse(text = "Here are your folders."))
+                    agent.transport.send(context.command.tag + OkResponse(text = "Here are your subscriptions."))
                 }
-//                STATUS,
+                is SubscribeCommand -> {
+                    mailbox.subscribe(command.mailbox)
+
+                    agent.transport.send(context.command.tag + OkResponse(text = "subscribed."))
+                }
+                is StatusCommand -> {
+                   val mailbox = mailbox.folder(command.mailbox)!!
+
+                   val responses = command.items.associateWith {
+                       when (it) {
+                           StatusDataItem.Messages -> mailbox.exists
+                           StatusDataItem.Recent -> mailbox.recent
+                           StatusDataItem.UidNext -> mailbox.uidNext
+                           StatusDataItem.UidValidity -> mailbox.uidValidity
+                           StatusDataItem.Unseen -> mailbox.recent // TODO: unseen
+                       }
+                   }
+
+                    agent.transport.send(Tag.Untagged + StatusResponse(mailbox.name, responses))
+
+                    agent.transport.send(context.command.tag + OkResponse(text = "status complete."))
+                }
 //                APPEND,
 //                IDLE
                 else -> context.wasProcessed = false
             }
         }
     }
-    class Selected(val agent: ImapAgent, val mailbox: ImapMailbox): State {
+    class Selected(val agent: ImapAgent, val authenticated: Authenticated, val folder: ImapFolder): State {
         override suspend fun handle(context: ImapCommandContext) {
             context.wasProcessed = true
             val command = context.command.command
 
             when (command) {
-
-                else -> context.wasProcessed = false
+                is FetchCommand -> {
+                    fetch(context.command.tag, command)
+                }
+                is UidCommand -> {
+                    val form = command.command
+                    when (form) {
+                        is FetchCommand -> fetch(context.command.tag, form)
+                        else -> error("shouldnt happen, it wouldnt get deserialized.")
+                    }
+                }
+                else -> authenticated.handle(context) // authenticated commands are allowed here
             }
+        }
+
+        private suspend fun fetch(tag: Tag, command: FetchCommand) {
+            folder.fetch(command.sequence, command.dataItems).forEach { (id, items) ->
+                agent.transport.send(Tag.Untagged + FetchResponse(id, items))
+            }
+
+            agent.transport.send(tag + OkResponse(text = "Here is your mail."))
         }
     }
     class Logout(): State {

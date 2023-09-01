@@ -8,6 +8,7 @@ import dev.sitar.kmail.imap.frames.command.ImapCommand
 import dev.sitar.kmail.imap.frames.response.ImapResponse
 import dev.sitar.kmail.imap.frames.response.TaggedImapResponse
 import dev.sitar.kmail.utils.connection.Connection
+import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import mu.KotlinLogging
@@ -29,6 +30,10 @@ class ImapServerTransport(var connection: Connection) {
             val context = ImapCommandContext(command, false)
             commandPipeline.process(context)
         }
+    }
+
+    suspend fun readData(): String {
+        return reader.readUtf8UntilLineEnd()
     }
 
     suspend fun send(response: TaggedImapResponse) {

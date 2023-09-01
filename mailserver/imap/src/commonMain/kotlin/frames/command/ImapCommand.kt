@@ -10,13 +10,16 @@ sealed interface ImapCommand {
         Logout(LogoutCommand),
         Noop(NoOpCommand),
         StartTls(StartTlsCommand),
+        Authenticate(AuthenticateCommand),
         Select(SelectCommand),
         Uid(UidCommand),
         Login(LoginCommand),
         List(ListCommand),
         Lsub(ListSubscriptionsCommand),
+        Subscribe(SubscribeCommand),
         Fetch(FetchCommand),
-        Create(CreateCommand);
+        Create(CreateCommand),
+        Status(StatusCommand);
 
         companion object {
             fun findByIdentifier(identifier: String) : Identifier? {

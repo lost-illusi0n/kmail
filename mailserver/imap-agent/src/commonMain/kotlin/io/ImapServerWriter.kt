@@ -18,11 +18,11 @@ class ImapServerWriter(val writer: AsyncWriterStream) : AsyncWriterStream by wri
 
             writer.flush()
 
-            println(it.fullSlice().joinToString("") {
-                it.toInt().toChar().toString()
-                    .replace("\r", "\\r")
-                    .replace("\n", "\\n\n")
-            })
+//            println(it.fullSlice().joinToString("") {
+//                it.toInt().toChar().toString()
+//                    .replace("\r", "\\r")
+//                    .replace("\n", "\\n\n")
+//            })
         }
 
         taggedResponse.tag.serialize(this)

@@ -32,8 +32,11 @@ data class KmailConfig(
     val imap: Imap,
     val pop3: Pop3,
 ) {
-    // TODO: wait for issue99 to be fixed
-    val accounts = listOf(Account("catlover69", "password1234", "marco@storm.sitar.dev"))
+    // TODO: store accounts?
+    val accounts = listOf(
+        Account("catlover69", "password1234", "marco@storm.sitar.dev"),
+        Account("doglover420", "password1234", "dogs@storm.sitar.dev")
+    )
 
     data class Account(
         val username: String,

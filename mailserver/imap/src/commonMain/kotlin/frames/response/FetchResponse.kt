@@ -4,7 +4,7 @@ import dev.sitar.kio.async.writers.AsyncWriter
 import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.utils.io.writeStringUtf8
 
-data class FetchResponse(val id: Int, val items: List<DataItem.Response>): ImapResponse {
+data class FetchResponse(val id: Int, val items: Set<DataItem.Response>): ImapResponse {
     override suspend fun serialize(output: AsyncWriter) {
         output.writeStringUtf8("$id FETCH (")
 

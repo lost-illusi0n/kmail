@@ -4,6 +4,8 @@ rootProject.name = "kmail-mailserver"
 include("pop3")
 include("imap")
 include("smtp")
+
+include("sasl")
 include("message-format")
 
 include("pop3-agent")

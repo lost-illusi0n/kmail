@@ -42,7 +42,7 @@ class KmailPop3Layer(val storage: StorageLayer): Pop3Layer {
 class KmailPop3Message(val message: MailboxMessage) : Pop3Message {
     private val content = message.message.asText()
 
-    override val uniqueIdentifier: String = message.uniqueIdentifier
+    override val uniqueIdentifier: String = message.name
 
     override val size: Int = content.length
 

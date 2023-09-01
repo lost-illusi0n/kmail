@@ -21,6 +21,7 @@ suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: Con
 
         val mailbox = mailbox(incoming)
 
+        if (Config.imap.enabled) launch { imap(serverSocketFactory, KmailImapLayer(mailbox)) }
         if (Config.pop3.enabled) launch { pop3(serverSocketFactory, KmailPop3Layer(mailbox)) }
         if (Config.smtp.submission.enabled) launch { submission(serverSocketFactory, outgoing) }
         if (Config.smtp.transfer.enabled) launch { transfer(serverSocketFactory, connectionFactory, outgoing, incoming) }

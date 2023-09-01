@@ -9,11 +9,9 @@ import dev.sitar.kio.buffers.DefaultBufferPool
  * not concurrent
  */
 class BufferAsyncWriterStream(val buffer: Buffer): AsyncWriterStream {
-    override val bufferPool: Pool<Buffer>
-        get() = TODO("Not yet implemented")
+    override val bufferPool: Pool<Buffer> = DefaultBufferPool
 
-    override val openForWrite: Boolean
-        get() = TODO("Not yet implemented")
+    override val openForWrite: Boolean = true
 
     private var flushBuffer = DefaultBufferPool.acquire(32)
 

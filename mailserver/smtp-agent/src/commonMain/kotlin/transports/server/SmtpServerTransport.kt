@@ -44,9 +44,12 @@ class SmtpServerTransport(connection: Connection, coroutineContext: CoroutineCon
 
         scope.launch {
             while (isActive) {
-                val command = lock.withLock { reader.readSmtpCommand() }
-
-                val context = SmtpCommandContext(command, true)
+                val context = try {
+                    val command = lock.withLock { reader.readSmtpCommand() }
+                    SmtpCommandContext.Known(command, true)
+                } catch (e: Exception) {
+                    SmtpCommandContext.Unknown(true)
+                }
 
                 commandPipeline.process(context)
             }

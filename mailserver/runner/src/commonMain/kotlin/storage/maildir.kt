@@ -33,13 +33,20 @@ interface Mailbox {
 
     fun folder(name: String): MailboxFolder
 
+    fun createFolder(name: String)
+
     fun store(message: Message)
 }
 
-data class MailboxMessage(val uniqueIdentifier: String, val message: Message)
+data class MailboxMessage(val name: String, val message: Message)
 
 interface MailboxFolder {
     val name: String
+
+    val totalMessages: Int
+
+    val newMessages: Int
+
 
     fun messages(): List<MailboxMessage>
 
@@ -50,13 +57,16 @@ class Maildir(val user: File) : Mailbox {
     override val inbox: MaildirInbox = MaildirInbox(user)
 
     override fun folders(): List<String> {
-        return user.list()?.asList()?.minus(arrayOf("new", "cur")) ?: emptyList()
+        return user.listFiles { file -> file.isDirectory }.orEmpty().toList().map { it.name }.minus(arrayOf("new", "cur", "tmp")).plus("INBOX")
     }
 
     override fun folder(name: String): MailboxFolder {
-        println("folder: $name")
         require(name in folders())
-        return MaildirFolder(user.resolve(name))
+        return if (name == "INBOX") inbox else MaildirFolder(user.resolve(name))
+    }
+
+    override fun createFolder(name: String) {
+        MaildirFolder(user.resolve(name))
     }
 
     override fun store(message: Message) {
@@ -85,6 +95,11 @@ class MaildirInbox(val user: File) : MailboxFolder {
     override val name: String
         get() = "INBOX"
 
+    override val totalMessages: Int
+        get() = new.totalMessages + cur.totalMessages
+    override val newMessages: Int
+        get() = new.totalMessages
+
     override fun messages(): List<MailboxMessage> {
         return new.messages() + cur.messages()
     }
@@ -108,6 +123,10 @@ private fun File.toMailboxMessage(): MailboxMessage {
 
 class MaildirFolder(val folder: File) : MailboxFolder {
     override val name: String = folder.name
+
+    override val totalMessages: Int = folder.list()?.size ?: 0
+
+    override val newMessages: Int = if (folder.name == "new") totalMessages else 0
 
     init {
         folder.mkdir()

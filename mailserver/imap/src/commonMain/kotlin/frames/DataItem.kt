@@ -14,7 +14,8 @@ sealed interface DataItem {
         Flags("Flags", Fetch.Flags),
         Uid("UID", Fetch.Uid),
         Rfc822Size("RFC822.SIZE", Fetch.Rfc822Size),
-        BodyPeek("BODY.PEEK", Fetch.BodyPeek);
+        BodyPeek("BODY.PEEK", Fetch.BodyPeek),
+        Body("BODY", Fetch.Body);
 
         companion object {
             fun from(raw: String): Identifier? {
@@ -42,9 +43,13 @@ sealed interface DataItem {
             }
         }
 
-        data class BodyPeek(val parts: List<PartSpecifier.Fetch>): Fetch {
-            companion object: Serializer<BodyPeek> {
-                override suspend fun deserialize(input: AsyncReader): BodyPeek {
+        sealed interface BodyType: Fetch {
+            val parts: List<PartSpecifier.Fetch>
+        }
+
+        data class Body(override val parts: List<PartSpecifier.Fetch>): Fetch, BodyType {
+            companion object: Serializer<Body> {
+                override suspend fun deserialize(input: AsyncReader): Body {
                     val parts = buildList {
                         while (true) {
                             val identifier = input.readUtf8StringUntil { it == ' ' || it == ']' }
@@ -57,7 +62,15 @@ sealed interface DataItem {
                         }
                     }
 
-                    return BodyPeek(parts)
+                    return Body(parts)
+                }
+            }
+        }
+
+        data class BodyPeek(val body: Body): Fetch, BodyType by body {
+            companion object: Serializer<BodyPeek> {
+                override suspend fun deserialize(input: AsyncReader): BodyPeek {
+                    return BodyPeek(Body.deserialize(input))
                 }
             }
         }
@@ -86,25 +99,21 @@ sealed interface DataItem {
             }
         }
 
-        data class BodyPeek(val parts: List<PartSpecifier.Response>): Response {
+        data class Body(val part: PartSpecifier.Response): Response {
             override suspend fun serialize(output: AsyncWriter) {
-                parts.forEachIndexed { index, part ->
-                    if (index != 0) output.write(' '.code.toByte())
+                output.writeStringUtf8("BODY[")
 
-                    output.writeStringUtf8("BODY.PEEK[")
+                part.serializeInline(output)
 
-                    part.serializeInline(output)
+                output.writeStringUtf8("]")
 
-                    output.writeStringUtf8("]")
+                DefaultBufferPool.use(32) {
+                    // we first serialize into a temp buffer as to know the size of the part. we then use that as the origin octet
+                    part.serializeBody(it.toAsyncWriter())
 
-                    DefaultBufferPool.use(32) {
-                        // we first serialize into a temp buffer as to know the size of the part. we then use that as the origin octet
-                        part.serializeBody(it.toAsyncWriter())
-
-                        if (it.writeIndex > 0) {
-                            output.writeStringUtf8(" {${it.writeIndex + 2}}\r\n") // we add 2 for the following \r\n
-                            output.writeBytes(it.fullSlice())
-                        }
+                    if (it.writeIndex > 0) {
+                        output.writeStringUtf8(" {${it.writeIndex}}\r\n")
+                        output.writeBytes(it.fullSlice())
                     }
                 }
             }

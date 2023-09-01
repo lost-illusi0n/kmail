@@ -16,3 +16,4 @@ val KMAIL_ASCII = """
 """.removePrefix("\n")
 
 val POP3_SERVER = 110
+val IMAP_SERVER = 143

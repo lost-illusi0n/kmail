@@ -13,9 +13,15 @@ data class FetchCommand(val sequence: Sequence, val dataItems: List<DataItem.Fet
         suspend fun deserialize(mode: Sequence.Mode, input: AsyncReader): FetchCommand {
             val sequence = Sequence.deserialize(mode, input)
 
-            if (input.read() != '('.code.toByte()) TODO("syntax error")
+            val char = input.read()
 
-            val items = buildList {
+            val items = if (char != '('.code.toByte()) {
+                val identifier = input.readUtf8StringUntil { it == ' ' || it == '[' }
+
+                val typed = DataItem.Identifier.from("${char.toInt().toChar()}$identifier") ?: TODO("unknown data item: $identifier")
+
+                listOf(typed.fetchSerializer.deserialize(input))
+            } else buildList {
                 var isFinal = false
 
                 while (!isFinal) {

@@ -6,6 +6,14 @@ import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import dev.sitar.kmail.utils.io.writeStringUtf8
 
 sealed interface Tag {
+    object None: Tag {
+        override suspend fun serialize(output: AsyncWriter) { }
+
+        override fun toString(): String {
+            return "None"
+        }
+    }
+
     object Untagged: Tag {
         override suspend fun serialize(output: AsyncWriter) {
             output.writeStringUtf8("* ")

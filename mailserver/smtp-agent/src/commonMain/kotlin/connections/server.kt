@@ -1,6 +1,7 @@
 package dev.sitar.kmail.agents.smtp.connections
 
 import dev.sitar.kmail.agents.smtp.queueId
+import dev.sitar.kmail.agents.smtp.transports.server.SmtpCommandContext
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpCommandPipeline
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.message.Message
@@ -25,7 +26,15 @@ abstract class ServerConnection(val transport: SmtpServerTransport, private val 
     suspend fun handle() {
         transport.commandPipeline {
             filter(SmtpCommandPipeline.Logging) {
-                logger.trace { "FROM ${transport.remote}: $command" }
+                when (this) {
+                    is SmtpCommandContext.Known -> logger.trace { "FROM ${transport.remote}: $command" }
+                    is SmtpCommandContext.Unknown -> {
+                        logger.warn { "FROM ${transport.remote}: unknown!" }
+                        continuePropagation = false
+                        transport.send(SmtpReply.PermanentNegative.Default(code = 500))
+                        close()
+                    }
+                }
             }
         }
 
@@ -51,6 +60,8 @@ class QuitExtension(override val server: ServerConnection): ServerExtension {
     override fun apply() {
         server.transport.commandPipeline {
             filter(SmtpCommandPipeline.Process) {
+                require(this is SmtpCommandContext.Known)
+
                 if (command is QuitCommand) {
                     continuePropagation = false
 
@@ -66,6 +77,8 @@ class QuitExtension(override val server: ServerConnection): ServerExtension {
 class EhloExtension(override val server: ServerConnection, val domain: Domain): ServerExtension {
     override fun apply() {
         server.transport.commandPipeline.filter(SmtpCommandPipeline.Process) {
+            require(this is SmtpCommandContext.Known)
+
             if (command is EhloCommand) {
                 val capabilities = server.allExtensions.flatMap { it.capabilities() }
 
@@ -79,6 +92,8 @@ class StartTlsExtension(override val server: ServerConnection): ServerExtension 
     override fun apply() {
         server.transport.commandPipeline {
             filter(SmtpCommandPipeline.Process) {
+                require(this is SmtpCommandContext.Known)
+
                 if (command is StartTlsCommand) {
                     require(!server.transport.isSecure)
                     server.transport.send(ReadyToStartTlsCompletion("start tls."))
@@ -121,6 +136,8 @@ class MailExtension(override val server: ServerConnection, val addresses: List<S
         // TODO: spam filtering???
         server.transport.commandPipeline {
             filter(SmtpCommandPipeline.Process) {
+                require(this is SmtpCommandContext.Known)
+
                 if (command !is MailCommand) return@filter
 
                 state = State(command)
@@ -129,6 +146,8 @@ class MailExtension(override val server: ServerConnection, val addresses: List<S
             }
 
             filter(SmtpCommandPipeline.Process) {
+                require(this is SmtpCommandContext.Known)
+
                 if (command !is RecipientCommand) return@filter
 
                 if (addresses?.contains(command.to.mailbox.asText()) == false) {
@@ -141,6 +160,8 @@ class MailExtension(override val server: ServerConnection, val addresses: List<S
             }
 
             filter(SmtpCommandPipeline.Process) {
+                require(this is SmtpCommandContext.Known)
+
                 if (command !is DataCommand) return@filter
 
                 server.transport.send(StartMailInputIntermediary("End message with <CR><LF>.<CR><LF>"))

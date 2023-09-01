@@ -17,7 +17,7 @@ dir = "mail"
 #url = "..."
 
 [imap]
-enabled = false
+enabled = true
 
 [pop3]
 enabled = true

@@ -20,7 +20,7 @@ class ImapServer(
             launch {
                 logger.debug { "Accepted a connection from ${transport.remote}" }
 
-                ImapAgent(transport, layer)
+                ImapAgent(transport, layer).handle()
             }
         }
     }

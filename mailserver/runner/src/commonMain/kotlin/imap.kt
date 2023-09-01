@@ -2,52 +2,89 @@ package dev.sitar.kmail.runner
 
 import dev.sitar.kmail.imap.PartSpecifier
 import dev.sitar.kmail.imap.Sequence
-import dev.sitar.kmail.imap.agent.ImapFolder
-import dev.sitar.kmail.imap.agent.ImapLayer
-import dev.sitar.kmail.imap.agent.ImapMailbox
-import dev.sitar.kmail.imap.agent.ImapServer
+import dev.sitar.kmail.imap.agent.*
 import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.message.Message
-import dev.sitar.kmail.message.headers.from
-import dev.sitar.kmail.message.headers.messageId
-import dev.sitar.kmail.message.headers.subject
-import dev.sitar.kmail.message.headers.toRcpt
-import dev.sitar.kmail.message.message
-import dev.sitar.kmail.runner.storage.MailboxFolder
-import dev.sitar.kmail.runner.storage.StorageLayer
+import dev.sitar.kmail.runner.storage.*
+import dev.sitar.kmail.sasl.SaslChallenge
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import io.ktor.util.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 import mu.KotlinLogging
-import kotlin.random.Random
+import java.io.File
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun imapServer(socket: ServerSocketFactory, layer: ImapLayer): ImapServer = coroutineScope {
+suspend fun imap(socket: ServerSocketFactory, layer: ImapLayer): ImapServer = coroutineScope {
     logger.info("Starting IMAP server.")
 
-    val server = ImapServer(socket.bind(143), layer)
+    val server = ImapServer(socket.bind(IMAP_SERVER), layer)
     launch { server.listen() }
 
     logger.info("Started IMAP server.")
+
     server
 }
 
-class KmailImapMailbox(val mailbox: MailboxFolder) : ImapMailbox {
-    override val name: String = mailbox.name
+class KmailImapMessage(val folder: KmailImapFolder, override val sequenceNumber: Int, override val typed: Message) :
+    ImapMessage {
+    override val uniqueIdentifier: Int = sequenceNumber
 
-    override val flags: Set<String> = setOf("\\Seen", "\\Answered", "\\Flagged", "\\Deleted", "\\Draft")
+    override val size: Int = typed.size
+}
 
-    override val exists: Int
-        get() = mailbox.messages().size
+// TODO: use abstracted FS
+class KmailImapFolder(val folder: MailboxFolder, val root: File) : ImapFolder {
+    override val name: String = folder.name
 
-    override val recent: Int
-        get() = 0
-    override val uidValidity: Int
-        get() = 0
-    override val uidNext: Int
-        get() = 0
+    override val attributes: Set<String> = setOf("HasNoChildren")
+
+    override val flags: Set<String> = emptySet()
+
+    override val exists: Int get() = folder.totalMessages
+
+    override val recent: Int get() = folder.newMessages
+
+    override var uidValidity: Int
+        get() = root.resolve("UIDVALIDITY").also { it.createNewFile() }.readText().toIntOrNull() ?: run {
+            uidValidity = Clock.System.now().epochSeconds.toInt(); uidValidity
+        }
+        set(value) = root.resolve("UIDVALIDITY").also { it.createNewFile() }.writeText(value.toString())
+
+    // TODO: this can break if a message is deleted...
+    override val uidNext: Int get() = exists + 1
+
+    override val messages: List<ImapMessage> =
+        folder.messages().mapIndexed { index, message -> KmailImapMessage(this, index + 1, message.message) }
+}
+
+// TODO: use abstracted FS
+class KmailImapMailbox(val mailbox: Mailbox, val root: File) : ImapMailbox {
+    override fun folders(): List<LightImapFolder> {
+        return mailbox.folders().map { LightImapFolder(setOf("HasNoChildren"), it) }
+    }
+
+    override fun folder(name: String): ImapFolder? {
+        return KmailImapFolder(mailbox.folder(name), if (name == "INBOX") root else root.resolve(name)) // TODO: this is purely dependent on maildir code... any other format will probably break
+    }
+
+    override fun createFolder(name: String) {
+        mailbox.createFolder(name)
+    }
+
+    override fun subscriptions(): List<String> {
+        val subscriptions = root.resolve("subscriptions")
+        if (!subscriptions.exists()) subscriptions.createNewFile()
+        return subscriptions.readLines()
+    }
+
+    override fun subscribe(folder: String) {
+        val subscriptions = root.resolve("subscriptions")
+        if (!subscriptions.exists()) subscriptions.createNewFile()
+        subscriptions.writer().appendLine("$folder\n")
+    }
 }
 
 class KmailImapLayer(val storage: StorageLayer): ImapLayer {
@@ -56,69 +93,21 @@ class KmailImapLayer(val storage: StorageLayer): ImapLayer {
         println("creating a mailbox called $folder")
     }
 
-    override suspend fun login(username: String, password: String): Boolean {
-        return Config.accounts.any { it.username.contentEquals(username) && it.password.contentEquals(password) }
+    override suspend fun authenticate(challenge: SaslChallenge): String? {
+        require(challenge is SaslChallenge.Plain)
+
+        return Config.accounts.firstOrNull {
+            it.username.contentEquals(challenge.authenticationIdentity)
+                    && it.password.contentEquals(challenge.password)
+        }?.username
     }
 
-    override suspend fun select(username: String, mailbox: String): ImapMailbox {
-        return KmailImapMailbox(storage.user(username).folder(mailbox))
-    }
-
-    override fun listFolders(referenceName: String, forMailbox: String): List<ImapFolder> {
-        return listOf(
-            ImapFolder(listOf(), "INBOX"), ImapFolder(listOf(), "Sent"), ImapFolder(listOf(), "Trash")
+    override suspend fun mailbox(username: String): ImapMailbox {
+        // TODO: fs
+        return KmailImapMailbox(
+            storage.user(username),
+            File("${(Config.mailbox.filesystem as KmailConfig.Mailbox.Filesystem.Local).dir}/$username")
         )
-    }
-
-    override fun listSubscribedFolders(referenceName: String, forMailbox: String): List<ImapFolder> {
-        return listOf(
-//            ImapFolder(listOf(), "INBOX"),
-        )
-    }
-
-    override fun fetch(
-        mailbox: String, sequence: Sequence, dataItems: List<DataItem.Fetch>
-    ): Map<Int, List<DataItem.Response>> = sequence.map {
-        val message = randomMessage()
-
-        buildList {
-            // if sequence is UID the UID response is implicit
-            if (sequence.mode == Sequence.Mode.Uid && DataItem.Fetch.Uid !in dataItems) {
-                add(DataItem.Response.Uid(it.toString()))
-            }
-
-            for (item in dataItems) when (item) {
-                DataItem.Fetch.Flags -> add(DataItem.Response.Flags(listOf("\\RECENT")))
-                DataItem.Fetch.Rfc822Size -> add(DataItem.Response.Rfc822Size(message.size))
-                DataItem.Fetch.Uid -> add(DataItem.Response.Uid(it.toString()))
-                is DataItem.Fetch.BodyPeek -> for (part in item.parts) when (part) {
-                    is PartSpecifier.Fetch.HeaderFields -> add(
-                        DataItem.Response.BodyPeek(
-                            listOf(
-                                PartSpecifier.Response.HeaderFields(message.headers.filter { header -> part.specifiedFields.any { it.contentEquals(header.fieldName, ignoreCase = true) } })
-                            )
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    fun <T> Sequence.map(block: (id: Int) -> T): Map<Int, T> {
-        return buildMap { repeat(19) { put(it + 1, block(it + 1)) } }
-    }
-
-    private fun randomMessage(): Message = message {
-        headers {
-            +from("Joe <joe@bob.com>")
-            +toRcpt("Bob <bob@joe.com>")
-            +subject("a message ${Random.nextBytes(20).encodeBase64().removeSuffix("=")}")
-            +messageId("<${Random.nextBytes(20).encodeBase64().removeSuffix("=")}@mail.bob.com>")
-        }
-
-        body {
-            line("asdasd")
-        }
     }
 }
 

@@ -12,6 +12,8 @@ kotlin {
 
     sourceSets["commonMain"].dependencies {
         api(project(":imap"))
+        api(project(":sasl"))
+        implementation(project(":message-format"))
         implementation(project(":utils"))
         implementation("io.github.microutils:kotlin-logging:3.0.2")
 
