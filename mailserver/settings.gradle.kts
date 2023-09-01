@@ -16,13 +16,6 @@ include("runner")
 
 include("utils")
 
-// TODO: publish keystone
-includeBuild("../../keystone") {
-    dependencySubstitution {
-        substitute(module("dev.sitar:keystone")).using(project(":"))
-    }
-}
-
 pluginManagement {
     resolutionStrategy {
         eachPlugin {
