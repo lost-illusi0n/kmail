@@ -3,6 +3,10 @@ package dev.sitar.kmail.runner.storage
 import dev.sitar.kmail.runner.Config
 import dev.sitar.kmail.runner.KmailConfig
 import dev.sitar.kmail.runner.filterSpam
+import dev.sitar.kmail.runner.storage.filesystems.CachedFileSystem
+import dev.sitar.kmail.runner.storage.filesystems.InMemoryFileSystem
+import dev.sitar.kmail.runner.storage.filesystems.LocalFileSystem
+import dev.sitar.kmail.runner.storage.filesystems.S3FileSystem
 import dev.sitar.kmail.smtp.InternetMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -11,12 +15,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
-fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLayer {
-    require(Config.mailbox.filesystem is KmailConfig.Mailbox.Filesystem.Local)
-    val storage = KmailFileSystemStorageLayer(Config.mailbox.filesystem.dir)
-//    val mailbox = when (Config.mailbox.format) {
-//        KmailConfig.Mailbox.Format.Maildir -> Maildir(File(Config.mailbox.dir).also { it.mkdir() })
-//    }
+suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLayer {
+    val filesystem = when (Config.mailbox.filesystem) {
+        is KmailConfig.Mailbox.Filesystem.InMemory -> InMemoryFileSystem()
+        is KmailConfig.Mailbox.Filesystem.Local -> LocalFileSystem(Config.mailbox.filesystem)
+        is KmailConfig.Mailbox.Filesystem.S3 -> S3FileSystem(Config.mailbox.filesystem)
+    }
+
+    filesystem.init()
+
+    val storage = KmailStorageLayer(CachedFileSystem(filesystem))
 
     launch {
         incoming.filterSpam().mapToAccount().onEach { (account, message) ->

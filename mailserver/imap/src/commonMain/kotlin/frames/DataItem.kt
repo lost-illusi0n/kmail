@@ -93,7 +93,7 @@ sealed interface DataItem {
             }
         }
 
-        data class Rfc822Size(val size: Int): Response {
+        data class Rfc822Size(val size: Long): Response {
             override suspend fun serialize(output: AsyncWriter) {
                 output.writeStringUtf8("RFC822.SIZE $size")
             }

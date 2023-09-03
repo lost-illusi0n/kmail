@@ -27,6 +27,8 @@ kotlin {
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
 
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+        implementation("aws.sdk.kotlin:s3:0.32.0-beta")
+
         implementation(project(":smtp-agent"))
         implementation(project(":smtp"))
         implementation(project(":imap-agent"))

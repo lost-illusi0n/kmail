@@ -107,25 +107,25 @@ sealed interface State {
 
             when (context.command) {
                 is StatCommand -> {
-                    agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount} ${maildrop.dropSize}"))
+                    agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount()} ${maildrop.dropSize()}"))
                 }
                 is ListCommand -> {
                     val message = context.command.messageNumber
 
                     if (message == null) {
-                        agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount} messages (${maildrop.dropSize} octets)"))
+                        agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount()} messages (${maildrop.dropSize()} octets)"))
 
-                        repeat(maildrop.messageCount) {
-                            agent.transport.sendReply(Pop3Reply.DataReply("${it + 1} ${maildrop.messages[it].size}"))
+                        repeat(maildrop.messageCount()) {
+                            agent.transport.sendReply(Pop3Reply.DataReply("${it + 1} ${maildrop.messages()[it].size}"))
                         }
 
                         agent.transport.sendReply(Pop3Reply.DataReply("."))
                     } else {
-                        agent.transport.sendReply(Pop3Reply.OkReply("$message ${maildrop.messages[message - 1].size}"))
+                        agent.transport.sendReply(Pop3Reply.OkReply("$message ${maildrop.messages()[message - 1].size}"))
                     }
                 }
                 is RetrCommand -> {
-                    val message = maildrop.messages[context.command.messageNumber - 1]
+                    val message = maildrop.messages()[context.command.messageNumber - 1]
                     agent.transport.sendReply(Pop3Reply.OkReply("${message.size} octets"))
                     agent.transport.sendReply(Pop3Reply.DataReply(message.getContent()))
                     agent.transport.sendReply(Pop3Reply.DataReply("."))
@@ -135,15 +135,15 @@ sealed interface State {
                     val message = context.command.msg
 
                     if (message == null) {
-                        agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount} messages"))
+                        agent.transport.sendReply(Pop3Reply.OkReply("${maildrop.messageCount()} messages"))
 
-                        repeat(maildrop.messageCount) {
-                            agent.transport.sendReply(Pop3Reply.DataReply("${it + 1} ${maildrop.messages[it].uniqueIdentifier}"))
+                        repeat(maildrop.messageCount()) {
+                            agent.transport.sendReply(Pop3Reply.DataReply("${it + 1} ${maildrop.messages()[it].uniqueIdentifier}"))
                         }
 
                         agent.transport.sendReply(Pop3Reply.DataReply("."))
                     } else {
-                        agent.transport.sendReply(Pop3Reply.OkReply("$message ${maildrop.messages[message - 1].uniqueIdentifier}"))
+                        agent.transport.sendReply(Pop3Reply.OkReply("$message ${maildrop.messages()[message - 1].uniqueIdentifier}"))
                     }
                 }
 //                is QuitCommand -> {

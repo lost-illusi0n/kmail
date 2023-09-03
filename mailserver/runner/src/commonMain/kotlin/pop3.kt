@@ -4,8 +4,8 @@ import dev.sitar.kmail.agents.pop3.Pop3Layer
 import dev.sitar.kmail.agents.pop3.Pop3Maildrop
 import dev.sitar.kmail.agents.pop3.Pop3Message
 import dev.sitar.kmail.agents.pop3.Pop3Server
-import dev.sitar.kmail.runner.storage.Mailbox
-import dev.sitar.kmail.runner.storage.MailboxMessage
+import dev.sitar.kmail.runner.storage.formats.Mailbox
+import dev.sitar.kmail.runner.storage.formats.MailboxMessage
 import dev.sitar.kmail.runner.storage.StorageLayer
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import kotlinx.coroutines.coroutineScope
@@ -40,16 +40,14 @@ class KmailPop3Layer(val storage: StorageLayer): Pop3Layer {
 }
 
 class KmailPop3Message(val message: MailboxMessage) : Pop3Message {
-    private val content = message.message.asText()
-
     override val uniqueIdentifier: String = message.name
 
-    override val size: Int = content.length
+    override val size: Long = message.length
 
     override val deleted: Boolean
         get() = false
 
-    override fun getContent(): String = content
+    override suspend fun getContent(): String = message.getMessage().asText()
 
     override fun delete() {
         TODO("Not yet implemented")
@@ -59,7 +57,15 @@ class KmailPop3Message(val message: MailboxMessage) : Pop3Message {
 class KmailPop3Maildrop(private val mailbox: Mailbox) : Pop3Maildrop {
     private val folder = mailbox.inbox
 
-    override val messages: List<KmailPop3Message> = folder.messages().map { KmailPop3Message(it) }
+    private lateinit var _messages: List<KmailPop3Message>
+
+    override suspend fun messages(): List<KmailPop3Message> {
+        if (this::_messages.isInitialized) return _messages
+
+        _messages = folder.messages().map { KmailPop3Message(it) }
+
+        return _messages
+    }
 
     override fun commit() {
         TODO()

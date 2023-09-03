@@ -1,5 +1,6 @@
 package dev.sitar.kmail.runner
 
+import aws.sdk.kotlin.services.s3.model.BucketLocationConstraint
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.JsonTypeName
@@ -14,9 +15,15 @@ import dev.sitar.kmail.agents.smtp.transports.SMTP_TRANSFER_PORT
 import dev.sitar.kmail.smtp.Domain
 import java.io.File
 
-object DomainSerializer : StdDeserializer<Domain>(Domain::class.java) {
+private object DomainSerializer : StdDeserializer<Domain>(Domain::class.java) {
     override fun deserialize(p: JsonParser, ctxt: DeserializationContext): Domain {
         return Domain.fromText(p.valueAsString)!!
+    }
+}
+
+private object BucketLocationSerializer : StdDeserializer<BucketLocationConstraint>(BucketLocationSerializer::class.java) {
+    override fun deserialize(p: JsonParser, ctxt: DeserializationContext): BucketLocationConstraint {
+        return BucketLocationConstraint.fromValue(p.valueAsString)
     }
 }
 
@@ -57,6 +64,16 @@ data class KmailConfig(
         sealed interface Filesystem {
             @JsonTypeName("local")
             data class Local(val dir: String): Filesystem
+
+            @JsonTypeName("in-memory")
+            object InMemory: Filesystem
+
+            @JsonTypeName("s3")
+            data class S3(val region: BucketLocationConstraint, val bucket: Bucket, @JsonProperty("root-dir") val rootFolder: String?, val credentials: Credentials?, val backend: Backend?): Filesystem {
+                data class Bucket(val name: String, val location: BucketLocationConstraint)
+                data class Backend(val endpoint: String, val pathStyleAccessEnabled: Boolean = false)
+                data class Credentials(val username: String, val password: String)
+            }
         }
     }
 
@@ -90,4 +107,8 @@ data class KmailConfig(
     )
 }
 
-val Config: KmailConfig = TomlMapper().registerKotlinModule().registerModule(SimpleModule().addDeserializer(Domain::class.java, DomainSerializer)).readValue(File("kmail.toml"), KmailConfig::class.java)
+val Config: KmailConfig = TomlMapper().registerKotlinModule().registerModule(
+    SimpleModule()
+        .addDeserializer(Domain::class.java, DomainSerializer)
+        .addDeserializer(BucketLocationConstraint::class.java, BucketLocationSerializer)
+).readValue(File("kmail.toml"), KmailConfig::class.java)

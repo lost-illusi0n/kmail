@@ -11,27 +11,31 @@ interface ImapMessage {
     val uniqueIdentifier: Int
     val sequenceNumber: Int
 
-    val size: Int
+    val size: Long
 
-    val typed: Message
+    suspend fun typedMessage(): Message
 }
 
 interface ImapFolder {
     val name: String
 
     val attributes: Set<String>
-
     val flags: Set<String>
-    val exists: Int
-    val recent: Int
-//    val unseen: Int
-    val uidValidity: Int
-    val uidNext: Int
 
-    val messages: List<ImapMessage>
+    suspend fun exists(): Int
+    suspend fun recent(): Int
 
-    fun fetch(sequence: Sequence, dataItems: List<DataItem.Fetch>): Map<Int, Set<DataItem.Response>> {
-        val messagesSnapshot = messages
+    //    val unseen: Int
+    suspend fun uidValidity(): Int
+
+    suspend fun setUidValidity(value: Int)
+
+    suspend fun uidNext(): Int
+
+    suspend fun messages(): List<ImapMessage>
+
+    suspend fun fetch(sequence: Sequence, dataItems: List<DataItem.Fetch>): Map<Int, Set<DataItem.Response>> {
+        val messagesSnapshot = messages()
 
         val start = when (sequence) {
             is Sequence.Set -> with(sequence.start) {
@@ -62,6 +66,8 @@ interface ImapFolder {
                 }
             }
         }
+
+        val exists = exists()
 
         if (!(start in 0..exists && end in 0..exists)) return emptyMap()
 
@@ -94,15 +100,17 @@ interface ImapFolder {
                     DataItem.Fetch.Rfc822Size -> add(DataItem.Response.Rfc822Size(message.size))
                     DataItem.Fetch.Uid -> add(DataItem.Response.Uid(message.uniqueIdentifier.toString()))
                     is DataItem.Fetch.BodyType -> {
+                        val typed = message.typedMessage()
+
                         if (item.parts.isEmpty()) {
-                            add(DataItem.Response.Body(PartSpecifier.Response.Body(message.typed)))
+                            add(DataItem.Response.Body(PartSpecifier.Response.Body(typed)))
                         }
 
                         for (part in item.parts) when (part) {
                             // TODO: handle peek/read
                             is PartSpecifier.Fetch.HeaderFields -> add(
                                 DataItem.Response.Body(
-                                    PartSpecifier.Response.HeaderFields(message.typed.headers.filter { header ->
+                                    PartSpecifier.Response.HeaderFields(typed.headers.filter { header ->
                                         part.specifiedFields.any {
                                             it.contentEquals(
                                                 header.fieldName,
@@ -114,7 +122,7 @@ interface ImapFolder {
                             )
 
                             is PartSpecifier.Fetch.Header -> {
-                                add(DataItem.Response.Body(PartSpecifier.Response.Header(message.typed.headers.toList())))
+                                add(DataItem.Response.Body(PartSpecifier.Response.Header(typed.headers.toList())))
                             }
                         }
                     }

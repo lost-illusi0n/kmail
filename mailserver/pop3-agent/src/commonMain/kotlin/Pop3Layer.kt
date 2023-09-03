@@ -7,22 +7,23 @@ interface Pop3Layer {
 }
 
 interface Pop3Maildrop {
-    val messages: List<Pop3Message>
+    suspend fun messages(): List<Pop3Message>
 
     fun commit()
 }
 
-val Pop3Maildrop.messageCount: Int get() = messages.size
-val Pop3Maildrop.dropSize: Int get() = messages.sumOf { it.size }
+suspend fun Pop3Maildrop.messageCount(): Int = messages().size
+
+suspend fun Pop3Maildrop.dropSize(): Long = messages().sumOf { it.size }
 
 interface Pop3Message {
     val uniqueIdentifier: String
 
-    val size: Int
+    val size: Long
 
     val deleted: Boolean
 
-    fun getContent(): String
+    suspend fun getContent(): String
 
     fun delete()
 }

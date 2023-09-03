@@ -262,11 +262,11 @@ sealed interface State {
 
                     if (folder != null) {
                         agent.transport.send(Tag.Untagged + FlagsResponse(flags = folder.flags))
-                        agent.transport.send(Tag.Untagged + ExistsResponse(n = folder.exists))
-                        agent.transport.send(Tag.Untagged + RecentResponse(n = folder.recent))
+                        agent.transport.send(Tag.Untagged + ExistsResponse(n = folder.exists()))
+                        agent.transport.send(Tag.Untagged + RecentResponse(n = folder.recent()))
 //                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UNSEEN ${folder.unseen}]"))
-                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${folder.uidValidity}]")) // TODO: this is a response code
-                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${folder.uidNext}]")) // TODO: this is a response code
+                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${folder.uidValidity()}]")) // TODO: this is a response code
+                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${folder.uidNext()}]")) // TODO: this is a response code
                         agent.transport.send(context.command.tag + OkResponse(text = "[READ-WRITE] SELECT complete."))
 
                         agent.state = Selected(agent, this, folder)
@@ -315,11 +315,11 @@ sealed interface State {
 
                    val responses = command.items.associateWith {
                        when (it) {
-                           StatusDataItem.Messages -> mailbox.exists
-                           StatusDataItem.Recent -> mailbox.recent
-                           StatusDataItem.UidNext -> mailbox.uidNext
-                           StatusDataItem.UidValidity -> mailbox.uidValidity
-                           StatusDataItem.Unseen -> mailbox.recent // TODO: unseen
+                           StatusDataItem.Messages -> mailbox.exists()
+                           StatusDataItem.Recent -> mailbox.recent()
+                           StatusDataItem.UidNext -> mailbox.uidNext()
+                           StatusDataItem.UidValidity -> mailbox.uidValidity()
+                           StatusDataItem.Unseen -> mailbox.recent() // TODO: unseen
                        }
                    }
 
