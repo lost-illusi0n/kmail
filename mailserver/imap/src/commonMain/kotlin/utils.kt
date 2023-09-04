@@ -8,8 +8,8 @@ internal suspend fun AsyncReader.readValue(isEnd: Boolean): String {
     return (if (isEnd) readUtf8UntilLineEnd() else readUtf8StringUntil { it == ' ' }).removePrefix("\"").removeSuffix("\"")
 }
 
-internal suspend fun AsyncReader.readList(): List<String> {
-    if (read().toInt().toChar() != '(') TODO("bad syntax")
+internal suspend fun AsyncReader.readList(checkFirst: Boolean = true): List<String> {
+    if (checkFirst && read().toInt().toChar() != '(') TODO("bad syntax")
 
     val list = readUtf8StringUntil { it == ')' }
 

@@ -64,11 +64,9 @@ class CachedFolder(val folder: FsFolder): FsFolder {
 
     override suspend fun listFiles(): List<FsFile> {
         if (hasRetrievedFiles) {
-            println("hit cache")
             return files
         }
         else {
-            println("cache miss")
             files = folder.listFiles().map { CachedFile(it.name, it.size) { it.readContent() } }.toMutableList()
             hasRetrievedFiles = true
             return files
@@ -99,7 +97,7 @@ class CachedFolder(val folder: FsFolder): FsFolder {
     override suspend fun move(file: String, folder: FsFolder) {
         require(folder is CachedFolder)
 
-        folder.move(file, folder.folder)
+        this.folder.move(file, folder.folder)
 
         val file = files.find { it.name == file }!!
         files.remove(file)

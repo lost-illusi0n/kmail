@@ -18,6 +18,8 @@ interface Mailbox: Attributable {
 interface MailboxFolder: Attributable {
     val name: String
 
+    var onMessageStore: (suspend (Message) -> Unit)?
+
     suspend fun totalMessages(): Int
 
     suspend fun newMessages(): Int

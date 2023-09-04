@@ -63,10 +63,10 @@ class LocalFolder(val file: File): FsFolder, Attributable {
         return LocalFile(file)
     }
 
-    override suspend fun move(name: String, folder: FsFolder) {
+    override suspend fun move(file: String, folder: FsFolder) {
         require(folder is LocalFolder)
 
-        this.file.resolve(name).renameTo(folder.file.resolve(name))
+        this.file.resolve(file).renameTo(folder.file.resolve(file))
     }
 }
 

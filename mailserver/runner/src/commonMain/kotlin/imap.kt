@@ -26,13 +26,11 @@ suspend fun imap(socket: ServerSocketFactory, layer: ImapLayer): ImapServer = co
     server
 }
 
-class KmailImapMessage(val folder: KmailImapFolder, override val sequenceNumber: Int, val message: MailboxMessage) : ImapMessage {
+class KmailImapMessage(val folder: KmailImapFolder, override val sequenceNumber: Int, override val size: Long, val message: suspend () -> Message) : ImapMessage {
     override val uniqueIdentifier: Int = sequenceNumber
 
-    override val size: Long = message.length
-
     override suspend fun typedMessage(): Message {
-        return message.getMessage()
+        return message()
     }
 }
 
@@ -68,7 +66,16 @@ class KmailImapFolder(val folder: MailboxFolder) : ImapFolder {
     }
 
     override suspend fun messages(): List<ImapMessage> {
-        return folder.messages().mapIndexed { index, message -> KmailImapMessage(this, index + 1, message) }
+        return folder.messages().mapIndexed { index, message -> KmailImapMessage(
+            this,
+            index + 1,
+            message.length,
+            message::getMessage
+        ) }
+    }
+
+    override suspend fun onMessageStore(handler: (suspend (ImapMessage) -> Unit)?) {
+        folder.onMessageStore = { handler?.invoke(KmailImapMessage(this, exists(), it.size.toLong()) { it }) }
     }
 }
 
@@ -96,9 +103,9 @@ class KmailImapMailbox(val mailbox: Mailbox) : ImapMailbox {
 }
 
 class KmailImapLayer(val storage: StorageLayer): ImapLayer {
-    override suspend fun create(username: String, folder: String) {
-        storage.user(username).folder(folder)
-        println("creating a mailbox called $folder")
+    override suspend fun create(username: String, mailbox: String) {
+        storage.user(username).folder(mailbox)
+        println("creating a mailbox called $mailbox")
     }
 
     override suspend fun authenticate(challenge: SaslChallenge): String? {

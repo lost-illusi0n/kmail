@@ -7,11 +7,16 @@ import dev.sitar.kmail.runner.storage.formats.Mailbox
 import dev.sitar.kmail.runner.storage.formats.Maildir
 
 class KmailStorageLayer(override val fs: FileSystem) : StorageLayer {
+    private val activeUsers = mutableMapOf<String, Mailbox>()
+
     override suspend fun user(username: String): Mailbox {
-        val user = fs.folder(username)
+        var user = activeUsers[username]
+        if (user != null) return user
+
+        val folder = fs.folder(username)
 
         return when (Config.mailbox.format) {
-            KmailConfig.Mailbox.Format.Maildir -> Maildir(user)
-        }
+            KmailConfig.Mailbox.Format.Maildir -> Maildir(folder)
+        }.also { activeUsers[username] = it }
     }
 }

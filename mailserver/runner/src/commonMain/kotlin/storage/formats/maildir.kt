@@ -57,6 +57,8 @@ class MaildirInbox(val user: FsFolder) : MailboxFolder, Attributable by user {
     override val name: String
         get() = "INBOX"
 
+    override var onMessageStore: (suspend (Message) -> Unit)? = null
+
     override suspend fun totalMessages(): Int = new.totalMessages() + cur.totalMessages()
 
     override suspend fun newMessages(): Int = new.totalMessages()
@@ -72,11 +74,14 @@ class MaildirInbox(val user: FsFolder) : MailboxFolder, Attributable by user {
     suspend fun store(message: Message) {
         val name = tmp.store(message)
         tmp.moveFile(name, new)
+        onMessageStore?.invoke(message)
     }
 }
 
 class MaildirFolder(val folder: FsFolder) : MailboxFolder, Attributable by folder {
     override val name: String = folder.name
+
+    override var onMessageStore: (suspend (Message) -> Unit)? = null
 
     override suspend fun totalMessages(): Int = folder.listFiles().size
 
@@ -106,11 +111,12 @@ class MaildirFolder(val folder: FsFolder) : MailboxFolder, Attributable by folde
         )
 
         folder.writeFile(name.value, message.asText().encodeToByteArray())
+        onMessageStore?.invoke(message)
         return name
     }
 
     suspend fun moveFile(name: MaildirUniqueName, to: MaildirFolder) {
-        folder.move(name.value, to.folder)
+        return folder.move(name.value, to.folder)
     }
 }
 

@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import mu.KotlinLogging
+
+private val logger = KotlinLogging.logger { }
 
 suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLayer {
     val filesystem = when (Config.mailbox.filesystem) {
@@ -28,6 +31,7 @@ suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLaye
 
     launch {
         incoming.filterSpam().mapToAccount().onEach { (account, message) ->
+            logger.debug { "received email for ${account.email}" }
             storage.user(account.username).store(message.message)
         }.launchIn(this)
     }

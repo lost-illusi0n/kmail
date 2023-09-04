@@ -65,6 +65,7 @@ class ImapAgent(
     private val capabilities: List<Capability>
         get() = buildList {
             add(Capability.Imap4Rev1)
+            add(Capability.Idle)
             add(Capability.LoginDisabled)
 
             if (state is State.NotAuthenticated) {
@@ -77,132 +78,6 @@ class ImapAgent(
                 add(Capability.StartTls)
             }
         }
-//
-//    private suspend fun notAuthenticated() {
-//        val taggedCommand = transport.recv()
-//
-//        when (taggedCommand.command) {
-//            StartTlsCommand -> {
-//                transport.send(taggedCommand.tag + OkResponse(text = "Let the TLS negotiations begin."))
-//                transport = transport.upgrade()
-//            }
-//
-//            is LoginCommand -> {
-//                // TODO: check auth
-//                transport.send(taggedCommand.tag + OkResponse(text = "LOGIN completed."))
-//                state = ImapState.Authenticated
-//            }
-//            // TODO: authenticate and login
-//            else -> universalHandler(taggedCommand)
-//        }
-//    }
-//
-//    private suspend fun authenticated() {
-//        val taggedCommand = transport.recv()
-//
-//        val tag = taggedCommand.tag
-//
-//        when (val command = taggedCommand.command) {
-//            is SelectCommand -> {
-//                val selectedMailbox = layer.select(command.mailboxName)
-//
-//                transport.send(Tag.Untagged + FlagsResponse(flags = selectedMailbox.flags))
-//                transport.send(Tag.Untagged + ExistsResponse(n = selectedMailbox.exists))
-//                transport.send(Tag.Untagged + RecentResponse(n = selectedMailbox.recent))
-//                transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${selectedMailbox.uidValidity}]")) // TODO: this is a response code
-//                transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${selectedMailbox.uidNext}]")) // TODO: this is a response code
-//                transport.send(tag + OkResponse(text = "[READ-WRITE] SELECT complete."))
-//
-//                mailbox = command.mailboxName
-//                state = ImapState.Selected
-//            }
-//
-//            is ListCommand -> {
-//                layer.listFolders(command.referenceName, command.mailboxName).forEach {
-//                    transport.send(Tag.Untagged + ListResponse(it.attributes, ImapFolder.DELIM, it.name))
-//                }
-//
-//                transport.send(tag + OkResponse(text = "Here are your folders."))
-//            }
-//
-//            is ListSubscriptionsCommand -> {
-//                layer.listSubscribedFolders(command.referenceName, command.mailboxName).forEach {
-//                    transport.send(Tag.Untagged + ListSubscriptionsResponse(it.attributes, ImapFolder.DELIM, it.name))
-//                }
-//
-//                transport.send(tag + OkResponse(text = "Here are your subscribed folders."))
-//            }
-//
-//            is CreateCommand -> {
-//                // TODO: check the result of this call
-//                layer.create(command.mailboxName)
-//
-//                transport.send(tag + OkResponse(text = "Created a new mailbox."))
-//            }
-//
-//            else -> universalHandler(taggedCommand)
-//        }
-//    }
-//
-//    private suspend fun selected() {
-//        val taggedCommand = transport.recv()
-//        val command = taggedCommand.command
-//
-//        when (command) {
-//            is UidCommand -> {
-//                val form = command.command
-//                when (form) {
-//                    is FetchCommand -> fetch(taggedCommand.tag, form)
-//                    else -> error("shouldnt happen, it wouldnt get deserialized.")
-//                }
-//            }
-//            is FetchCommand -> fetch(taggedCommand.tag, command)
-//            else -> universalHandler(taggedCommand)
-//        }
-//    }
-//
-//    private suspend fun fetch(tag: Tag, command: FetchCommand) {
-//        layer.fetch(mailbox!!, command.sequence, command.dataItems).forEach { (id, items) ->
-//            println("got response $id $items")
-//            transport.send(Tag.Untagged + FetchResponse(id, items))
-//        }
-//
-//        transport.send(tag + OkResponse(text = "Here is your mail."))
-//    }
-//
-//    private suspend fun logout() {
-//
-//    }
-//
-//    private suspend fun universalHandler(taggedCommand: TaggedImapCommand) {
-//        when (taggedCommand.command) {
-//            CapabilityCommand -> {
-//                transport.send(Tag.Untagged + CapabilityResponse(capabilities))
-//                transport.send(taggedCommand.tag + OkResponse(text = "CAPABILITY completed."))
-//            }
-//
-//            NoOpCommand -> {
-//                transport.send(taggedCommand.tag + OkResponse(text = "NOOP completed."))
-//            }
-//
-//            LogoutCommand -> {
-//                try {
-//                    transport.send(Tag.Untagged + ByeResponse(text = "Bye!"))
-//                    transport.send(taggedCommand.tag + OkResponse(text = "Bye-bye!"))
-//                } catch (e: Exception) {
-//                    logger.error(e)
-//                }
-//
-//                transport.close()
-//                scope.cancel()
-//                state = ImapState.Logout
-//            }
-//            else -> {
-//                logger.error("IMAP(${transport.remote}, $state): Could not handle command: $taggedCommand.")
-//                transport.send(taggedCommand.tag + BadResponse(text  = "Could not handle command in current state."))
-//            }
-//        }
-//    }
 }
 
 sealed interface State {
@@ -339,6 +214,19 @@ sealed interface State {
             val command = context.command.command
 
             when (command) {
+                is IdleCommand -> {
+                    agent.transport.send(Tag.None + ContinueDataResponse)
+
+                    folder.onMessageStore {
+                        agent.transport.send(Tag.Untagged + ExistsResponse(n = folder.exists()))
+                    }
+
+                    require(agent.transport.readData().lowercase() == "done")
+
+                    folder.onMessageStore(null)
+
+                    agent.transport.send(context.command.tag + OkResponse(text = "done idling"))
+                }
                 is FetchCommand -> {
                     fetch(context.command.tag, command)
                 }

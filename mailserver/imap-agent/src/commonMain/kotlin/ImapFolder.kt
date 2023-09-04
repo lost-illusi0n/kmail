@@ -7,6 +7,20 @@ import dev.sitar.kmail.message.Message
 import kotlin.math.max
 import kotlin.math.min
 
+data class LightImapFolder(val attributes: Set<String>, val name: String)
+
+interface ImapMailbox {
+    suspend fun folders(): List<LightImapFolder>
+
+    fun folder(name: String): ImapFolder?
+
+    suspend fun createFolder(name: String)
+
+    suspend fun subscriptions(): List<String>
+
+    suspend fun subscribe(folder: String)
+}
+
 interface ImapMessage {
     val uniqueIdentifier: Int
     val sequenceNumber: Int
@@ -21,6 +35,8 @@ interface ImapFolder {
 
     val attributes: Set<String>
     val flags: Set<String>
+
+    suspend fun onMessageStore(handler: (suspend (ImapMessage) -> Unit)?)
 
     suspend fun exists(): Int
     suspend fun recent(): Int
