@@ -5,7 +5,11 @@ Kmail is a lightweight mail server solution written in Kotlin. Instead of packin
 > Kmail is incomplete and under active development!
 
 ## Getting Started
-Running from outside an IDE is not yet supported. Kmail will be dockerized soon.
+
+### Docker
+`docker pull ghcr.io/lost-illusi0n/kmail:master`
+- map ports `143`, `110`, `587`, `25`
+- add volumes that contain your `kmail.toml` and anything else used by Kmail (e.g., certificates)
 
 ### Prerequisites
 For a smooth experience, you will need to:

@@ -1,13 +1,9 @@
 package dev.sitar.kmail.runner
 
-import dev.sitar.kmail.utils.connection.KtorConnectionFactory
 import dev.sitar.kmail.utils.connection.TlsCapableConnectionFactory
 import dev.sitar.kmail.utils.server.TlsCapableServerSocketFactory
 import io.ktor.network.tls.*
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import java.util.concurrent.Future
-import javax.net.ssl.SSLContext
 
 suspend fun main(): Unit = coroutineScope {
     dns()
