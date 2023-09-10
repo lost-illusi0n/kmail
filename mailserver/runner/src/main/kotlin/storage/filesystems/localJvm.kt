@@ -5,7 +5,7 @@ import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.Attributes
 import java.io.File
 
-actual class LocalFileSystem actual constructor(val config: KmailConfig.Mailbox.Filesystem.Local): FileSystem {
+class LocalFileSystem(val config: KmailConfig.Mailbox.Filesystem.Local): FileSystem {
     val root = File(config.dir)
 
     override suspend fun init() {

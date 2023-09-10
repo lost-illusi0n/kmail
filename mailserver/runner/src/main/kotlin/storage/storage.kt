@@ -19,13 +19,19 @@ import mu.KotlinLogging
 private val logger = KotlinLogging.logger { }
 
 suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLayer {
+    logger.info { "initiating filesystem" }
+
     val filesystem = when (Config.mailbox.filesystem) {
         is KmailConfig.Mailbox.Filesystem.InMemory -> InMemoryFileSystem()
         is KmailConfig.Mailbox.Filesystem.Local -> LocalFileSystem(Config.mailbox.filesystem)
         is KmailConfig.Mailbox.Filesystem.S3 -> S3FileSystem(Config.mailbox.filesystem)
     }
 
+    logger.info { "detected a ${Config.mailbox.filesystem} filesystem" }
+
     filesystem.init()
+
+    logger.info { "initiated filesystem" }
 
     val storage = KmailStorageLayer(CachedFileSystem(filesystem))
 
