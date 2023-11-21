@@ -110,6 +110,15 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
         return S3Folder(fileSystem, folderKey.append(name))
     }
 
+    override suspend fun getFile(name: String): FsFile {
+        val obj = client.headObject {
+            this.bucket = config.bucket.name
+            this.key = "$folderKey$name"
+        }
+
+        return FsFile(name, obj.contentLength)
+    }
+
     override suspend fun listFolders(): List<FsFolder> {
         // TODO: parse key
         return client.listObjectsV2 {
@@ -124,7 +133,7 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
             bucket = config.bucket.name
             this.delimiter = "/"
             this.prefix = folderKey.toString()
-        }.contents.orEmpty().filterNot { it.key!!.split('/').last().startsWith("kmail_") }.map { S3File(this, it.key!!.split('/').last(), it.size) }
+        }.contents.orEmpty().filterNot { it.key!!.split('/').last().startsWith("kmail_") }.map { FsFile(it.key!!.split('/').last(), it.size) }
     }
 
     override suspend fun readFile(name: String): ByteArray? {
@@ -147,7 +156,7 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
             body = ByteStream.fromBytes(contents)
         }
 
-        return S3File(this, "$folderKey$name", contents.size.toLong())
+        return FsFile("$folderKey$name", contents.size.toLong())
     }
 
     override suspend fun move(file: String, folder: FsFolder) {
@@ -164,13 +173,39 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
             this.key = "$folderKey$file"
         }
     }
-}
 
-class S3File(val folder: S3Folder, override val name: String, override val size: Long): FsFile, S3Context by folder {
-    override suspend fun readContent(): ByteArray {
-        return folder.readFile(name)!!
+    override suspend fun rename(from: String, to: String) {
+        client.copyObject {
+            bucket = config.bucket.name
+            key = "$folderKey$to"
+            copySource = "/${config.bucket.name}/$folderKey$from"
+        }
+
+        client.deleteObject {
+            bucket = config.bucket.name
+            this.key = "$folderKey$from"
+        }
     }
 }
+
+//class S3File(val folder: S3Folder, override val name: String, override val size: Long): FsFile, S3Context by folder {
+//    override suspend fun rename(name: String) {
+//        client.copyObject {
+//            bucket = config.bucket.name
+//            key = "${folder.folderKey}$name"
+//            copySource = "/${config.bucket.name}/${folder.folderKey}${this@S3File.name}"
+//        }
+//
+//        client.deleteObject {
+//            bucket = config.bucket.name
+//            this.key = "${folder.folderKey}${this@S3File.name}"
+//        }
+//    }
+//
+//    override suspend fun readContent(): ByteArray {
+//        return folder.readFile(name)!!
+//    }
+//}
 
 private suspend fun S3Client.bucketExists(bucket: String) = try {
     headBucket { this.bucket = bucket }

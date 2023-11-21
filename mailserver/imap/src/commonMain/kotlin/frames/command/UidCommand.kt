@@ -21,10 +21,12 @@ data class UidCommand(val command: ImapCommand): ImapCommand {
         }
 
         override suspend fun deserialize(input: AsyncReader): UidCommand {
-            val command = when (ImapCommand.Identifier.findByIdentifier(input.readCommandIdentifier())) {
+            val identifier = input.readCommandIdentifier()
+
+            val command = when (ImapCommand.Identifier.findByIdentifier(identifier)) {
                 ImapCommand.Identifier.Fetch -> FetchCommand.deserialize(Sequence.Mode.Uid, input)
                 // ImapCommand.Identifier.Search
-                else -> TODO("bad syntax")
+                else -> TODO("got $identifier")
             }
 
             return UidCommand(command)

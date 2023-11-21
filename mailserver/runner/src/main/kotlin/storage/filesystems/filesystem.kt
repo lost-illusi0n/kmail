@@ -15,6 +15,8 @@ interface FsFolder: Attributable {
 
     suspend fun createFolder(name: String): FsFolder
 
+    suspend fun getFile(name: String): FsFile?
+
     suspend fun listFiles(): List<FsFile>
 
     suspend fun listFolders(): List<FsFolder>
@@ -23,12 +25,10 @@ interface FsFolder: Attributable {
 
     suspend fun writeFile(name: String, contents: ByteArray): FsFile
 
+    // TODO: change this
     suspend fun move(file: String, folder: FsFolder)
+
+    suspend fun rename(from: String, to: String)
 }
 
-interface FsFile {
-    val name: String
-    val size: Long
-
-    suspend fun readContent(): ByteArray
-}
+data class FsFile(val name: String, val size: Long)

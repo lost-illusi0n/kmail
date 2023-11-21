@@ -53,6 +53,8 @@ class CachedFolder(val folder: FsFolder): FsFolder {
     private var hasRetrievedFiles = false
     var files = mutableListOf<FsFile>()
         private set
+    var fileContents = mutableMapOf<String, ByteArray>()
+        private set
 
     override fun folder(name: String): FsFolder {
         return folders.find { it.name == name } ?: CachedFolder(folder.folder(name)).also { folders.add(it) }
@@ -62,12 +64,16 @@ class CachedFolder(val folder: FsFolder): FsFolder {
         return CachedFolder(folder.createFolder(name)).also { folders.add(it) }
     }
 
+    override suspend fun getFile(name: String): FsFile? {
+        return files.find { it.name == name } ?: folder.getFile(name)?.also { files.add(it) }
+    }
+
     override suspend fun listFiles(): List<FsFile> {
         if (hasRetrievedFiles) {
             return files
         }
         else {
-            files = folder.listFiles().map { CachedFile(it.name, it.size) { it.readContent() } }.toMutableList()
+            files = folder.listFiles().toMutableList()
             hasRetrievedFiles = true
             return files
         }
@@ -83,14 +89,16 @@ class CachedFolder(val folder: FsFolder): FsFolder {
     }
 
     override suspend fun readFile(name: String): ByteArray? {
-        return files.find { it.name == name }?.readContent() ?: folder.readFile(name)?.also { files.add(CachedFile(name, it.size.toLong()) { it }) }
+        return folder.readFile(name)?.also { fileContents[name] = it }
     }
 
     override suspend fun writeFile(name: String, contents: ByteArray): FsFile {
         folder.writeFile(name, contents)
 
-        val cached = CachedFile(name, contents.size.toLong()) { contents }
+        val cached = FsFile(name, contents.size.toLong())
         files.add(cached)
+        fileContents[name] = contents
+
         return cached
     }
 
@@ -103,10 +111,14 @@ class CachedFolder(val folder: FsFolder): FsFolder {
         files.remove(file)
         folder.files.add(file)
     }
-}
 
-class CachedFile(override val name: String, override val size: Long, val content: suspend () -> ByteArray) : FsFile {
-    override suspend fun readContent(): ByteArray {
-        return content()
+    override suspend fun rename(from: String, to: String) {
+        folder.rename(from, to)
+
+        val file = files.find { it.name == from } ?: return
+        files.remove(file)
+        files.add(FsFile(to, file.size))
+
+        fileContents[to] = fileContents.remove(from) ?: return
     }
 }

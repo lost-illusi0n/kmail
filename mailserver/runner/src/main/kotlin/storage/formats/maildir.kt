@@ -1,16 +1,27 @@
 package dev.sitar.kmail.runner.storage.formats
 
+import dev.sitar.kmail.imap.agent.Flag
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.filesystems.FsFile
 import dev.sitar.kmail.runner.storage.filesystems.FsFolder
-import io.ktor.util.*
 import kotlinx.datetime.Clock
+import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 
+
+// TODO: this sucks
 @JvmInline
 value class MaildirUniqueName(val value: String) {
+    constructor(name: String, flags: Set<Flag>? = null) : this(name + flags.orEmpty().joinToString(prefix = ":2,", separator = "") {
+        if (it !is Flag.Other) it::class.simpleName!!.first().toString()
+        else {
+            logger.error { "encountered a non-standard flag. not yet supported" }
+            ""
+        }
+    })
+
     constructor(
         timestamp: Long,
         hostname: String,
@@ -21,23 +32,35 @@ value class MaildirUniqueName(val value: String) {
         deviceNumber: Int? = null,
         microseconds: Int? = null,
         processId: Int? = null,
-        deliveries: Int? = null
-    ): this("$timestamp.#${sequenceNumber}X${bootNumber}R${random}.$hostname")
+        deliveries: Int? = null,
+        flags: Set<Flag>? = null
+    ) : this("$timestamp.S${sequenceNumber}X${bootNumber}R${random}.$hostname", flags)
 
-    val timestamp: Long get() = 0
-    val unique: String get() = ""
-    val hostname: String get() = ""
+    val flags get() = value.split(':').last().run {
+        if (startsWith("2,")) removePrefix("2,").map { it.toFlag() } else emptyList()
+    }
+}
+
+private fun Char.toFlag(): Flag {
+    return when (this) {
+        'R' -> Flag.Replied
+        'S' -> Flag.Seen
+        'T' -> Flag.Trashed
+        'D' -> Flag.Draft
+        'F' -> Flag.Flagged
+        else -> error("unexpected maildir flag: $this")
+    }
 }
 
 class Maildir(val user: FsFolder) : Mailbox, Attributable by user {
-    override val inbox: MaildirInbox = MaildirInbox(user)
+    override val inbox: MaildirInbox = MaildirInbox(this, user)
 
     override suspend fun folders(): List<String> {
         return user.listFolders().map { it.name }.minus(arrayOf("new", "cur", "tmp")).plus("INBOX")
     }
 
     override fun folder(name: String): MailboxFolder {
-        return if (name == "INBOX") inbox else MaildirFolder(user.folder(name))
+        return if (name == "INBOX") inbox else MaildirFolder(this, user.folder(name))
     }
 
     override suspend fun createFolder(name: String) {
@@ -49,10 +72,10 @@ class Maildir(val user: FsFolder) : Mailbox, Attributable by user {
     }
 }
 
-class MaildirInbox(val user: FsFolder) : MailboxFolder, Attributable by user {
-    val tmp: MaildirFolder = MaildirFolder(user.folder("tmp"))
-    val new: MaildirFolder = MaildirFolder(user.folder("new"))
-    val cur: MaildirFolder = MaildirFolder(user.folder("cur"))
+class MaildirInbox(val mailbox: Maildir, val user: FsFolder) : MailboxFolder, Attributable by user {
+    val tmp: MaildirFolder = MaildirFolder(mailbox, user.folder("tmp"))
+    val new: MaildirFolder = MaildirFolder(mailbox, user.folder("new"))
+    val cur: MaildirFolder = MaildirFolder(mailbox, user.folder("cur"))
 
     override val name: String
         get() = "INBOX"
@@ -71,6 +94,10 @@ class MaildirInbox(val user: FsFolder) : MailboxFolder, Attributable by user {
         return messages()[index]
     }
 
+    override suspend fun messageByUid(uid: Int): MailboxMessage? {
+        return cur.messageByUid(uid)
+    }
+
     suspend fun store(message: Message) {
         val name = tmp.store(message)
         tmp.moveFile(name, new)
@@ -78,7 +105,7 @@ class MaildirInbox(val user: FsFolder) : MailboxFolder, Attributable by user {
     }
 }
 
-class MaildirFolder(val folder: FsFolder) : MailboxFolder, Attributable by folder {
+class MaildirFolder(val mailbox: Maildir, val folder: FsFolder) : MailboxFolder, Attributable by folder {
     override val name: String = folder.name
 
     override var onMessageStore: (suspend (Message) -> Unit)? = null
@@ -87,12 +114,16 @@ class MaildirFolder(val folder: FsFolder) : MailboxFolder, Attributable by folde
 
     override suspend fun newMessages(): Int = if (folder.name == "new") totalMessages() else 0
 
-    override suspend fun messages(): List<MailboxMessage> {
-        return folder.listFiles().map { MaildirMessage(it) }
+    override suspend fun messages(): List<MaildirMessage> {
+        return folder.listFiles().map { MaildirMessage(it.name, it.size, folder, mailbox) }
     }
 
-    override suspend fun message(index: Int): MailboxMessage {
+    override suspend fun message(index: Int): MaildirMessage {
         return messages()[index]
+    }
+
+    override suspend fun messageByUid(uid: Int): MailboxMessage? {
+        return messages().find { it.name.contains(uid.toString()) }
     }
 
     suspend fun store(message: Message): MaildirUniqueName {
@@ -111,7 +142,6 @@ class MaildirFolder(val folder: FsFolder) : MailboxFolder, Attributable by folde
         )
 
         folder.writeFile(name.value, message.asText().encodeToByteArray())
-        onMessageStore?.invoke(message)
         return name
     }
 
@@ -124,12 +154,27 @@ class MaildirFolder(val folder: FsFolder) : MailboxFolder, Attributable by folde
 // TODO: replace this with atomicfu
 private val deliveries: AtomicInteger = AtomicInteger(0)
 
-class MaildirMessage(val file: FsFile): MailboxMessage {
-    override val name: String = file.name
+private val logger = KotlinLogging.logger { }
 
-    override val length: Long = file.size
+class MaildirMessage(var fileName: String, override val length: Long, var folder: FsFolder, val mailbox: Maildir): MailboxMessage {
+    override val name: String = fileName.split(':').first()
+
+    override val flags: Set<Flag> = MaildirUniqueName(fileName).flags.toSet()
+
+    override suspend fun updateFlags(flags: Set<Flag>) {
+        if (Flag.Seen in flags) {
+            if (folder.name == "new") {
+                mailbox.inbox.new.moveFile(MaildirUniqueName(fileName), mailbox.inbox.cur)
+                folder = mailbox.inbox.cur.folder
+            }
+        }
+
+        val newName = MaildirUniqueName(name, flags).value
+        folder.rename(fileName, newName)
+        fileName = newName
+    }
 
     override suspend fun getMessage(): Message {
-        return Message.fromText(file.readContent().decodeToString())
+        return Message.fromText(folder.readFile(fileName)!!.decodeToString())
     }
 }

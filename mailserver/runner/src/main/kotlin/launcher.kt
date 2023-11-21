@@ -16,6 +16,8 @@ suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: Con
         println(KMAIL_ASCII)
         logger.info("Kmail is starting.")
 
+        logger.debug { "Detected following configuration: $Config" }
+
         val incoming = MutableSharedFlow<InternetMessage>()
         val outgoing = MutableSharedFlow<InternetMessage>()
 

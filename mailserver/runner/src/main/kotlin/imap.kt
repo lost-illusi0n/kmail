@@ -1,8 +1,9 @@
 package dev.sitar.kmail.runner
 
+import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.imap.agent.*
 import dev.sitar.kmail.message.Message
-import dev.sitar.kmail.runner.storage.*
+import dev.sitar.kmail.runner.storage.StorageLayer
 import dev.sitar.kmail.runner.storage.formats.Mailbox
 import dev.sitar.kmail.runner.storage.formats.MailboxFolder
 import dev.sitar.kmail.runner.storage.formats.MailboxMessage
@@ -12,6 +13,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import mu.KotlinLogging
+import kotlin.math.max
+import kotlin.math.min
 
 private val logger = KotlinLogging.logger { }
 
@@ -26,7 +29,13 @@ suspend fun imap(socket: ServerSocketFactory, layer: ImapLayer): ImapServer = co
     server
 }
 
-class KmailImapMessage(val folder: KmailImapFolder, override val sequenceNumber: Int, override val size: Long, val message: suspend () -> Message) : ImapMessage {
+// TODO: this is horrible
+class KmailImapMessage(
+    override val flags: Set<Flag>,
+    override val sequenceNumber: Int,
+    override val size: Long,
+    private val message: suspend () -> Message,
+) : ImapMessage {
     override val uniqueIdentifier: Int = sequenceNumber
 
     override suspend fun typedMessage(): Message {
@@ -67,15 +76,29 @@ class KmailImapFolder(val folder: MailboxFolder) : ImapFolder {
 
     override suspend fun messages(): List<ImapMessage> {
         return folder.messages().mapIndexed { index, message -> KmailImapMessage(
-            this,
+            message.flags,
             index + 1,
             message.length,
             message::getMessage
         ) }
     }
 
+    // TODO: mix-matched nullability
+    suspend fun get(pos: Int, mode: Sequence.Mode): MailboxMessage {
+        return when (mode) {
+            Sequence.Mode.SequenceNumber -> folder.message(exists() - pos)
+            Sequence.Mode.Uid -> folder.messageByUid(pos)!!
+        }
+    }
+
+    override suspend fun update(pos: Int, mode: Sequence.Mode, flags: Set<Flag>) {
+        val message = get(pos, mode)
+
+        message.updateFlags(flags)
+    }
+
     override suspend fun onMessageStore(handler: (suspend (ImapMessage) -> Unit)?) {
-        folder.onMessageStore = { handler?.invoke(KmailImapMessage(this, exists(), it.size.toLong()) { it }) }
+        folder.onMessageStore = { handler?.invoke(KmailImapMessage(setOf(Flag.Recent), exists(), it.size.toLong(), { it })) }
     }
 }
 

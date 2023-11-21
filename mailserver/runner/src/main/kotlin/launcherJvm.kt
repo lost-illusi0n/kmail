@@ -2,7 +2,6 @@ package dev.sitar.kmail.runner
 
 import dev.sitar.kmail.utils.connection.TlsCapableConnectionFactory
 import dev.sitar.kmail.utils.server.TlsCapableServerSocketFactory
-import io.ktor.network.tls.*
 import kotlinx.coroutines.coroutineScope
 
 suspend fun main(): Unit = coroutineScope {

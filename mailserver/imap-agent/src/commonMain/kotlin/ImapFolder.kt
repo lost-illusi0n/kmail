@@ -21,15 +21,27 @@ interface ImapMailbox {
     suspend fun subscribe(folder: String)
 }
 
+sealed class Flag(val value: String) {
+    object Replied: Flag("\\ANSWERED")
+    object Seen: Flag("\\SEEN")
+    object Trashed: Flag("\\DELETED")
+    object Draft: Flag("\\DRAFT")
+    object Flagged: Flag("\\FLAGGED")
+    object Recent: Flag("\\RECENT")
+    class Other(value: String): Flag(value)
+}
+
 interface ImapMessage {
     val uniqueIdentifier: Int
     val sequenceNumber: Int
+    val flags: Set<Flag>
 
     val size: Long
 
     suspend fun typedMessage(): Message
 }
 
+// TODO: maybe allow to lock?
 interface ImapFolder {
     val name: String
 
@@ -49,6 +61,8 @@ interface ImapFolder {
     suspend fun uidNext(): Int
 
     suspend fun messages(): List<ImapMessage>
+
+    suspend fun update(pos: Int, mode: Sequence.Mode, flags: Set<Flag>)
 
     suspend fun fetch(sequence: Sequence, dataItems: List<DataItem.Fetch>): Map<Int, Set<DataItem.Response>> {
         val messagesSnapshot = messages()
@@ -102,20 +116,24 @@ interface ImapFolder {
         }
 
         return selectedMessages.associate { message ->
-            when (sequence.mode) {
+            val pos = when (sequence.mode) {
                 Sequence.Mode.SequenceNumber -> message.sequenceNumber
                 Sequence.Mode.Uid -> message.uniqueIdentifier
-            } to buildSet {
+            }
+
+            pos to buildSet {
                 // if sequence is UID the UID response is implicit
                 if (sequence.mode == Sequence.Mode.Uid && DataItem.Fetch.Uid !in dataItems) {
                     add(DataItem.Response.Uid(message.uniqueIdentifier.toString()))
                 }
 
                 for (item in dataItems) when (item) {
-                    DataItem.Fetch.Flags -> add(DataItem.Response.Flags(listOf("\\Recent")))
+                    DataItem.Fetch.Flags -> add(DataItem.Response.Flags(message.flags.map { it.value }))
                     DataItem.Fetch.Rfc822Size -> add(DataItem.Response.Rfc822Size(message.size))
                     DataItem.Fetch.Uid -> add(DataItem.Response.Uid(message.uniqueIdentifier.toString()))
                     is DataItem.Fetch.BodyType -> {
+                        if (item is DataItem.Fetch.Body) update(pos, sequence.mode, setOf(Flag.Seen))
+
                         val typed = message.typedMessage()
 
                         if (item.parts.isEmpty()) {
@@ -137,8 +155,12 @@ interface ImapFolder {
                                 )
                             )
 
-                            is PartSpecifier.Fetch.Header -> {
+                            PartSpecifier.Fetch.Header -> {
                                 add(DataItem.Response.Body(PartSpecifier.Response.Header(typed.headers.toList())))
+                            }
+
+                            PartSpecifier.Fetch.Text -> {
+                                add(DataItem.Response.Body(PartSpecifier.Response.Text(typed.body ?: "")))
                             }
                         }
                     }

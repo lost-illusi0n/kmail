@@ -12,7 +12,8 @@ sealed interface PartSpecifier {
 
     enum class Identifier(val raw: String, val fetchSerializer: Fetch.Serializer<out Fetch>) {
         HeaderFields("HEADER.FIELDS", Fetch.HeaderFields),
-        Header("HEADER", Fetch.Header);
+        Header("HEADER", Fetch.Header),
+        Text("TEXT", Fetch.Text);
 
         companion object {
             fun from(raw: String): Identifier? {
@@ -37,6 +38,14 @@ sealed interface PartSpecifier {
 
             override suspend fun deserialize(input: AsyncReader): Header {
                 return Header
+            }
+        }
+
+        object Text: Fetch, Serializer<Text> {
+            override val identifier: Identifier = Identifier.Text
+
+            override suspend fun deserialize(input: AsyncReader): Text {
+                return Text
             }
         }
 
@@ -85,6 +94,17 @@ sealed interface PartSpecifier {
                     output.writeLineEnd()
                     output.writeLineEnd()
                 }
+            }
+        }
+
+        data class Text(val text: String): Response {
+            override val isInline: Boolean
+                get() = false
+
+            override suspend fun serializeInline(output: AsyncWriter) { }
+
+            override suspend fun serializeBody(output: AsyncWriter) {
+                output.writeStringUtf8(text)
             }
         }
 

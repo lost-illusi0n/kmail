@@ -45,8 +45,13 @@ class LocalFolder(val file: File): FsFolder, Attributable {
         return LocalFolder(file.resolve(name).also { it.mkdir() })
     }
 
+    override suspend fun getFile(name: String): FsFile {
+        val file = file.resolve(name)
+        return FsFile(file.name, file.length())
+    }
+
     override suspend fun listFiles(): List<FsFile> {
-        return file.listFiles { file -> !file.name.startsWith("KMAIL_") }.orEmpty().map { LocalFile(it) }
+        return file.listFiles { file -> !file.name.startsWith("KMAIL_") }.orEmpty().map { FsFile(it.name, it.length()) }
     }
 
     override suspend fun listFolders(): List<FsFolder> {
@@ -60,7 +65,7 @@ class LocalFolder(val file: File): FsFolder, Attributable {
     override suspend fun writeFile(name: String, contents: ByteArray): FsFile {
         val file = file.resolve(name).also { it.createNewFile() }
         file.writeBytes(contents)
-        return LocalFile(file)
+        return FsFile(file.name, file.length())
     }
 
     override suspend fun move(file: String, folder: FsFolder) {
@@ -68,13 +73,21 @@ class LocalFolder(val file: File): FsFolder, Attributable {
 
         this.file.resolve(file).renameTo(folder.file.resolve(file))
     }
-}
 
-class LocalFile(val file: File) : FsFile {
-    override val name: String = file.name
-    override val size: Long = file.length()
-
-    override suspend fun readContent(): ByteArray {
-        return file.readBytes()
+    override suspend fun rename(from: String, to: String) {
+        file.resolve(from).renameTo(file.resolve(to))
     }
 }
+
+//class LocalFile(val file: File) : FsFile {
+//    override val name: String = file.name
+//    override val size: Long = file.length()
+//
+//    override suspend fun rename(name: String) {
+//        file.renameTo(file.resolveSibling(name))
+//    }
+//
+//    override suspend fun readContent(): ByteArray {
+//        return file.readBytes()
+//    }
+//}

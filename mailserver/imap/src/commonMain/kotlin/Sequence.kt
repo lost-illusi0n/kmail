@@ -7,6 +7,7 @@ sealed class Sequence {
     abstract val mode: Mode
 
     data class Single(val pos: Position, override val mode: Mode): Sequence()
+
     data class Set(val start: Position, val end: Position, override val mode: Mode): Sequence()
 
     enum class Mode {

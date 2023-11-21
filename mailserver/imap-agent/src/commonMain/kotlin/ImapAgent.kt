@@ -231,11 +231,13 @@ sealed interface State {
                     fetch(context.command.tag, command)
                 }
                 is UidCommand -> {
-                    val form = command.command
-                    when (form) {
+                    when (val form = command.command) {
                         is FetchCommand -> fetch(context.command.tag, form)
                         else -> error("shouldnt happen, it wouldnt get deserialized.")
                     }
+                }
+                is CheckCommand -> {
+                    agent.transport.send(context.command.tag + OkResponse(text = "noop"))
                 }
                 else -> authenticated.handle(context) // authenticated commands are allowed here
             }

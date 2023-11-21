@@ -38,8 +38,12 @@ class InMemoryFolder(override val name: String): FsFolder {
         return InMemoryFolder(name).also { folders.add(it) }
     }
 
+    override suspend fun getFile(name: String): FsFile? {
+        return files.find { it.metadata.name == name }?.metadata
+    }
+
     override suspend fun listFiles(): List<FsFile> {
-        return files
+        return files.map { it.metadata }
     }
 
     override suspend fun listFolders(): List<FsFolder> {
@@ -47,26 +51,28 @@ class InMemoryFolder(override val name: String): FsFolder {
     }
 
     override suspend fun readFile(name: String): ByteArray? {
-        return files.find { it.name == name }?.content
+        return files.find { it.metadata.name == name }?.content
     }
 
     override suspend fun writeFile(name: String, contents: ByteArray): FsFile {
-        val file = InMemoryFile(name, contents)
+        val file = InMemoryFile(FsFile(name, contents.size.toLong()), contents)
         files.add(file)
-        return file
+        return file.metadata
     }
 
     override suspend fun move(file: String, folder: FsFolder) {
         require(folder is InMemoryFolder)
 
-        val file = files.find { it.name == file } ?: return
+        val file = files.find { it.metadata.name == file } ?: return
         files.remove(file)
         folder.files.add(file)
     }
+
+    override suspend fun rename(from: String, to: String) {
+        val file = files.find { it.metadata.name == from } ?: return
+        files.remove(file)
+        files.add(InMemoryFile(FsFile(to, file.metadata.size), file.content))
+    }
 }
 
-class InMemoryFile(override val name: String, val content: ByteArray): FsFile {
-    override val size: Long = content.size.toLong()
-
-    override suspend fun readContent(): ByteArray = content
-}
+class InMemoryFile(val metadata: FsFile, val content: ByteArray)
