@@ -48,6 +48,7 @@ class InternetMessageTest {
 
     @Test
     fun parseMessage() {
-        assertEquals(Message.fromText(raw), typed)
+        assertEquals(Message.fromText(raw).headers, typed.headers)
+        assertEquals(Message.fromText(raw).body, typed.body)
     }
 }
