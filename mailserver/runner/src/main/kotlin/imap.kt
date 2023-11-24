@@ -83,6 +83,10 @@ class KmailImapFolder(val folder: MailboxFolder) : ImapFolder {
         ) }
     }
 
+    override suspend fun save(flags: Set<Flag>, message: String) {
+        folder.store(flags, message)
+    }
+
     // TODO: mix-matched nullability
     suspend fun get(pos: Int, mode: Sequence.Mode): MailboxMessage {
         return when (mode) {
@@ -123,6 +127,10 @@ class KmailImapMailbox(val mailbox: Mailbox) : ImapMailbox {
     override suspend fun subscribe(folder: String) {
         mailbox.attributes.append("SUBSCRIPTIONS", folder)
     }
+
+    override suspend fun unsubscribe(folder: String) {
+        mailbox.attributes.remove("SUBSCRIPTIONS", folder)
+    }
 }
 
 class KmailImapLayer(val storage: StorageLayer): ImapLayer {
@@ -134,10 +142,12 @@ class KmailImapLayer(val storage: StorageLayer): ImapLayer {
     override suspend fun authenticate(challenge: SaslChallenge): String? {
         require(challenge is SaslChallenge.Plain)
 
+        if (!challenge.authorizationIdentity.isNullOrEmpty())
+            logger.warn { "authentication request from ${challenge.authenticationIdentity} is attempting to authorize as ${challenge.authorizationIdentity}. this is not supported and will be ignored." }
+
         return Config.accounts.firstOrNull {
-            it.username.contentEquals(challenge.authenticationIdentity)
-                    && it.password.contentEquals(challenge.password)
-        }?.username
+            it.email.contentEquals(challenge.authenticationIdentity) && passVerify(challenge.password, it.passwordHash)
+        }?.email
     }
 
     override suspend fun mailbox(username: String): ImapMailbox {

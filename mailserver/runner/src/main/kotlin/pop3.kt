@@ -27,11 +27,11 @@ suspend fun pop3(socket: ServerSocketFactory, layer: Pop3Layer): Pop3Server = co
 
 class KmailPop3Layer(val storage: StorageLayer): Pop3Layer {
     override suspend fun userExists(user: String): Boolean {
-        return Config.accounts.any { it.username.contentEquals(user) }
+        return Config.accounts.any { it.email.contentEquals(user) }
     }
 
     override suspend fun login(user: String, password: String): Boolean {
-        return Config.accounts.any { it.username.contentEquals(user) && it.password.contentEquals(password) }
+        return Config.accounts.any { it.email.contentEquals(user) && passVerify(password, it.passwordHash) }
     }
 
     override suspend fun maildrop(user: String): Pop3Maildrop {

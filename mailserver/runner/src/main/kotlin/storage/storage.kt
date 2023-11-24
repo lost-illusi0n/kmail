@@ -1,5 +1,6 @@
 package dev.sitar.kmail.runner.storage
 
+import dev.sitar.kmail.runner.Account
 import dev.sitar.kmail.runner.Config
 import dev.sitar.kmail.runner.KmailConfig
 import dev.sitar.kmail.runner.filterSpam
@@ -23,7 +24,7 @@ suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLaye
 
     val filesystem = when (Config.mailbox.filesystem) {
         is KmailConfig.Mailbox.Filesystem.InMemory -> InMemoryFileSystem()
-        is KmailConfig.Mailbox.Filesystem.Local -> LocalFileSystem(Config.mailbox.filesystem)
+        is KmailConfig.Mailbox.Filesystem.Local -> LocalFileSystem(Config.mailbox.filesystem.dir)
         is KmailConfig.Mailbox.Filesystem.S3 -> S3FileSystem(Config.mailbox.filesystem)
     }
 
@@ -34,18 +35,19 @@ suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLaye
     logger.info { "initiated filesystem" }
 
     val storage = KmailStorageLayer(CachedFileSystem(filesystem))
+    storage.init()
 
     launch {
         incoming.filterSpam().mapToAccount().onEach { (account, message) ->
             logger.debug { "received email for ${account.email}" }
-            storage.user(account.username).store(message.message)
+            storage.user(account.email).store(message.message.asText())
         }.launchIn(this)
     }
 
     return storage
 }
 
-private fun Flow<InternetMessage>.mapToAccount(): Flow<Pair<KmailConfig.Account, InternetMessage>> = map {
+private fun Flow<InternetMessage>.mapToAccount(): Flow<Pair<Account, InternetMessage>> = map {
     // find the user that an email associated with any of the rcpts of the message
     Config.accounts.find { acc ->
         it.envelope.recipientAddresses.any { addr ->

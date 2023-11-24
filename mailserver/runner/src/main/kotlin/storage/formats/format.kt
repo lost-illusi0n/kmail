@@ -7,13 +7,15 @@ import dev.sitar.kmail.runner.storage.Attributable
 interface Mailbox: Attributable {
     val inbox: MailboxFolder
 
+    suspend fun init()
+
     suspend fun folders(): List<String>
 
     fun folder(name: String): MailboxFolder
 
     suspend fun createFolder(name: String)
 
-    suspend fun store(message: Message)
+    suspend fun store(message: String)
 }
 
 interface MailboxFolder: Attributable {
@@ -30,6 +32,8 @@ interface MailboxFolder: Attributable {
     suspend fun message(index: Int): MailboxMessage
 
     suspend fun messageByUid(uid: Int): MailboxMessage?
+
+    suspend fun store(flags: Set<Flag>, message: String)
 }
 
 interface MailboxMessage {

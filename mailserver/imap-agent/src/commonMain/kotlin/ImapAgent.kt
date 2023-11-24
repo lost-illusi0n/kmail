@@ -158,8 +158,6 @@ sealed interface State {
                 }
 //                DELETE,
 //                RENAME,
-//                SUBSCRIBE,
-//                UNSUBSCRIBE,
                 is ListCommand -> {
                     if (command.referenceName == "" && command.mailboxName == "*") {
                         mailbox.folders().forEach {
@@ -185,6 +183,11 @@ sealed interface State {
 
                     agent.transport.send(context.command.tag + OkResponse(text = "subscribed."))
                 }
+                is UnsubscribeCommand -> {
+                    mailbox.unsubscribe(command.mailbox)
+
+                    agent.transport.send(context.command.tag + OkResponse(text = "unsubscribed."))
+                }
                 is StatusCommand -> {
                    val mailbox = mailbox.folder(command.mailbox)!!
 
@@ -202,8 +205,25 @@ sealed interface State {
 
                     agent.transport.send(context.command.tag + OkResponse(text = "status complete."))
                 }
-//                APPEND,
-//                IDLE
+                is AppendCommand -> {
+                    agent.transport.send(Tag.None + ContinueDataResponse)
+
+                    val message = agent.transport.readMessage(command.messageSize)
+
+                    val folder = mailbox.folder(command.mailbox) ?: TODO("folder doesnt exist")
+
+                    val flags = command.flags.orEmpty().map { Flag.fromValue(it) }
+                        .filter {
+                            if (it is Flag.Other) {
+                                logger.warn { "unsupported flag: $it. ignoring" }
+                                true
+                            } else false
+                        }.toSet()
+
+                    folder.save(flags, message)
+
+                    agent.transport.send(context.command.tag + OkResponse(text = "appended"))
+                }
                 else -> context.wasProcessed = false
             }
         }

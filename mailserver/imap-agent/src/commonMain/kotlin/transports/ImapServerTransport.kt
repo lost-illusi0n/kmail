@@ -1,5 +1,7 @@
 package dev.sitar.kmail.imap.agent.transports
 
+import dev.sitar.kio.buffers.DefaultBufferPool
+import dev.sitar.kio.use
 import dev.sitar.kmail.imap.agent.ImapCommandContext
 import dev.sitar.kmail.imap.agent.ImapCommandPipeline
 import dev.sitar.kmail.imap.agent.io.asImapServerReader
@@ -7,11 +9,14 @@ import dev.sitar.kmail.imap.agent.io.asImapServerWriter
 import dev.sitar.kmail.imap.frames.command.ImapCommand
 import dev.sitar.kmail.imap.frames.response.ImapResponse
 import dev.sitar.kmail.imap.frames.response.TaggedImapResponse
+import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.utils.connection.Connection
+import dev.sitar.kmail.utils.io.readStringUtf8
 import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import mu.KotlinLogging
+import kotlin.math.max
 
 private val logger = KotlinLogging.logger { }
 
@@ -34,6 +39,10 @@ class ImapServerTransport(var connection: Connection) {
 
     suspend fun readData(): String {
         return reader.readUtf8UntilLineEnd()
+    }
+
+    suspend fun readMessage(size: Int): String {
+        return reader.readStringUtf8(size)
     }
 
     suspend fun send(response: TaggedImapResponse) {

@@ -2,19 +2,22 @@ package dev.sitar.kmail.runner.storage.formats
 
 import dev.sitar.kmail.imap.agent.Flag
 import dev.sitar.kmail.message.Message
+import dev.sitar.kmail.runner.Config
 import dev.sitar.kmail.runner.storage.Attributable
-import dev.sitar.kmail.runner.storage.filesystems.FsFile
+import dev.sitar.kmail.runner.storage.filesystems.FileSystem
 import dev.sitar.kmail.runner.storage.filesystems.FsFolder
 import kotlinx.datetime.Clock
 import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 
+// TODO: this should change depending on platform. e.g., standard is : but windows doesnt support that, so it uses ; or - instead.
+const val MAILDIR_SEPERATOR = ";"
 
 // TODO: this sucks
 @JvmInline
 value class MaildirUniqueName(val value: String) {
-    constructor(name: String, flags: Set<Flag>? = null) : this(name + flags.orEmpty().joinToString(prefix = ":2,", separator = "") {
+    constructor(name: String, flags: Set<Flag>? = null) : this(name + flags.orEmpty().joinToString(prefix = "${MAILDIR_SEPERATOR}2,", separator = "") {
         if (it !is Flag.Other) it::class.simpleName!!.first().toString()
         else {
             logger.error { "encountered a non-standard flag. not yet supported" }
@@ -36,7 +39,7 @@ value class MaildirUniqueName(val value: String) {
         flags: Set<Flag>? = null
     ) : this("$timestamp.S${sequenceNumber}X${bootNumber}R${random}.$hostname", flags)
 
-    val flags get() = value.split(':').last().run {
+    val flags get() = value.split(MAILDIR_SEPERATOR).last().run {
         if (startsWith("2,")) removePrefix("2,").map { it.toFlag() } else emptyList()
     }
 }
@@ -55,6 +58,10 @@ private fun Char.toFlag(): Flag {
 class Maildir(val user: FsFolder) : Mailbox, Attributable by user {
     override val inbox: MaildirInbox = MaildirInbox(this, user)
 
+    override suspend fun init() {
+        if (attributes.get("SUBSCRIPTIONS")?.contains("INBOX") != true) attributes.append("SUBSCRIPTIONS", "INBOX")
+    }
+
     override suspend fun folders(): List<String> {
         return user.listFolders().map { it.name }.minus(arrayOf("new", "cur", "tmp")).plus("INBOX")
     }
@@ -67,8 +74,22 @@ class Maildir(val user: FsFolder) : Mailbox, Attributable by user {
         user.createFolder(name)
     }
 
-    override suspend fun store(message: Message) {
-        inbox.store(message)
+    override suspend fun store(message: String) {
+        inbox.store(emptySet(),  message)
+    }
+}
+
+// TODO: non maildir-default folders should start with a .
+private val DEFAULT_MAILDIR_USER_FOLDERS = arrayOf("new", "cur", "tmp", "Sent", "Drafts", "Trash")
+
+suspend fun initMailDirStructure(fs: FileSystem) {
+    Config.accounts.forEach {
+        val user = fs.folder(it.email)
+
+        for (folder in DEFAULT_MAILDIR_USER_FOLDERS) user.createFolder(folder)
+
+        if(user.attributes.get("SUBSCRIPTIONS").isNullOrEmpty())
+            user.attributes.set("SUBSCRIPTIONS", "INBOX\nSent\nDrafts\nTrash\n")
     }
 }
 
@@ -98,10 +119,10 @@ class MaildirInbox(val mailbox: Maildir, val user: FsFolder) : MailboxFolder, At
         return cur.messageByUid(uid)
     }
 
-    suspend fun store(message: Message) {
-        val name = tmp.store(message)
+    override suspend fun store(flags: Set<Flag>, message: String) {
+        val name = tmp.storeWithName(flags, message)
         tmp.moveFile(name, new)
-        onMessageStore?.invoke(message)
+        onMessageStore?.invoke(Message.fromText(message))
     }
 }
 
@@ -126,7 +147,7 @@ class MaildirFolder(val mailbox: Maildir, val folder: FsFolder) : MailboxFolder,
         return messages().find { it.name.contains(uid.toString()) }
     }
 
-    suspend fun store(message: Message): MaildirUniqueName {
+    suspend fun storeWithName(flags: Set<Flag>, message: String) : MaildirUniqueName {
         // TODO: populate this
         val name = MaildirUniqueName(
             Clock.System.now().epochSeconds,
@@ -138,11 +159,16 @@ class MaildirFolder(val mailbox: Maildir, val folder: FsFolder) : MailboxFolder,
             0,
             0,
             0,
-            deliveries.getAndIncrement()
+            deliveries.getAndIncrement(),
+            flags.takeIf { it.isNotEmpty() }
         )
 
-        folder.writeFile(name.value, message.asText().encodeToByteArray())
+        folder.writeFile(name.value, message.encodeToByteArray())
         return name
+    }
+
+    override suspend fun store(flags: Set<Flag>, message: String) {
+        storeWithName(flags, message)
     }
 
     suspend fun moveFile(name: MaildirUniqueName, to: MaildirFolder) {

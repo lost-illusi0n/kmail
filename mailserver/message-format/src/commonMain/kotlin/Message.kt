@@ -3,11 +3,17 @@ package dev.sitar.kmail.message
 import dev.sitar.kio.buffers.asBuffer
 import dev.sitar.kmail.message.headers.Header
 import dev.sitar.kmail.message.headers.Headers
+import kotlinx.datetime.FixedOffsetTimeZone
+import kotlinx.datetime.Instant
+import kotlinx.datetime.UtcOffset
+import kotlinx.datetime.toLocalDateTime
+import kotlin.math.absoluteValue
+import kotlin.math.sign
 
-// TODO: instead of fully parsing every email and turning it into a typed representation (perhaps with flaws), it could be better to keep the original email string and lazily parse it if needed
 data class Message(
     val headers: Headers,
-    val body: String?
+    val body: String?,
+    val text: String?
 ) {
     companion object {
         fun fromText(raw: String): Message {
@@ -30,11 +36,12 @@ data class Message(
                 }
             }
 
-            return Message(Headers(headers), body)
+            return Message(Headers(headers), body, raw)
         }
     }
 
     fun asText(): String {
+        if (text != null) return text
         val textHeaders = headers.joinToString("\r\n") { it.asText() } + "\r\n"
         return textHeaders + if (body != null) "\r\n$body" else ""
     }
@@ -46,8 +53,44 @@ data class Message(
 
 class MessageBuilder {
     class HeadersBuilder: MutableSet<Header> by mutableSetOf() {
-        operator fun Header.unaryPlus() {
-            add(this)
+        fun header(name: String, body: String) {
+            add(Header(name,  body))
+        }
+
+        fun from(from: String) {
+            header(Headers.From, from)
+        }
+
+        fun to(rcpt: String) {
+            header(Headers.To, rcpt)
+        }
+
+        fun subject(subject: String) {
+            header(Headers.Subject, subject)
+        }
+
+        fun originationDate(date: Instant, zone: UtcOffset) {
+            fun Instant.format(offset: UtcOffset): String {
+                with(toLocalDateTime(FixedOffsetTimeZone(offset))) {
+                    val offsetInHours = offset.totalSeconds / 60 / 60
+                    val sign = if (offsetInHours.sign == 1) "+" else "-"
+                    // FIXME?: why is zone 4 digits. can it account for minutes as well? if so do that
+                    val zone = "$sign${offsetInHours.absoluteValue.toString().padStart(2, '0').padEnd(4, '0')}"
+                    val dayOfWeek = dayOfWeek.name.take(3).lowercase().capitalize()
+                    val month = month.name.take(3).lowercase().capitalize()
+                    val hour = hour.toString().padStart(2, '0')
+                    val minute = minute.toString().padStart(2, '0')
+                    val second = second.toString().padStart(2, '0')
+
+                    return "$dayOfWeek, $dayOfMonth $month $year $hour:$minute:$second $zone"
+                }
+            }
+
+            header(Headers.OriginalDate, date.format(zone))
+        }
+
+        fun messageId(messageId: String) {
+            header(Headers.MessageId, messageId)
         }
     }
 
@@ -82,7 +125,7 @@ class MessageBuilder {
     }
 
     fun build(): Message {
-        return Message(Headers(headers.toSet()), body)
+        return Message(Headers(headers.toSet()), body, null)
     }
 }
 

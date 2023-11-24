@@ -29,9 +29,6 @@ dependencies {
 
     implementation("io.ktor:ktor-network-tls-certificates:2.1.3")
 
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.15.2")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
-
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("aws.sdk.kotlin:s3:0.32.0-beta")
 
@@ -39,4 +36,9 @@ dependencies {
     implementation(project(":smtp"))
     implementation(project(":imap-agent"))
     implementation(project(":pop3-agent"))
+
+    // JAVA
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.15.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
 }

@@ -4,6 +4,7 @@ import dev.sitar.kmail.imap.PartSpecifier
 import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.message.Message
+import java.util.Collections
 import kotlin.math.max
 import kotlin.math.min
 
@@ -19,6 +20,8 @@ interface ImapMailbox {
     suspend fun subscriptions(): List<String>
 
     suspend fun subscribe(folder: String)
+
+    suspend fun unsubscribe(folder: String)
 }
 
 sealed class Flag(val value: String) {
@@ -28,7 +31,19 @@ sealed class Flag(val value: String) {
     object Draft: Flag("\\DRAFT")
     object Flagged: Flag("\\FLAGGED")
     object Recent: Flag("\\RECENT")
-    class Other(value: String): Flag(value)
+    class Other(value: String): Flag(value) {
+        override fun toString(): String {
+            return "Other(value=$value)"
+        }
+    }
+
+    companion object {
+        private val values by lazy { arrayOf(Replied, Seen, Trashed, Draft, Flagged, Recent) }
+
+        fun fromValue(value: String): Flag {
+            return values.find { it.value.contentEquals(value, ignoreCase = true) } ?: Other(value)
+        }
+    }
 }
 
 interface ImapMessage {
@@ -61,6 +76,8 @@ interface ImapFolder {
     suspend fun uidNext(): Int
 
     suspend fun messages(): List<ImapMessage>
+
+    suspend fun save(flags: Set<Flag>, message: String)
 
     suspend fun update(pos: Int, mode: Sequence.Mode, flags: Set<Flag>)
 

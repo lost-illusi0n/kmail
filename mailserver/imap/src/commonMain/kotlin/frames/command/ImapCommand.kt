@@ -17,12 +17,14 @@ sealed interface ImapCommand {
         List(ListCommand),
         Lsub(ListSubscriptionsCommand),
         Subscribe(SubscribeCommand),
+        Unsubscribe(UnsubscribeCommand),
         Fetch(FetchCommand),
         Create(CreateCommand),
         Status(StatusCommand),
         Notify(NotifyCommand),
         Idle(IdleCommand),
-        Check(CheckCommand);
+        Check(CheckCommand),
+        Append(AppendCommand);
 
         companion object {
             fun findByIdentifier(identifier: String) : Identifier? {

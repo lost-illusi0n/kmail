@@ -39,8 +39,8 @@ object KmailAuthenticationManager : SubmissionAuthenticationManager<KmailAuthent
     override fun authenticate(mechanism: SaslMechanism): KmailAuthenticatedUser? {
         when (mechanism) {
             is PlainSaslMechanism -> {
-                if (Config.accounts.any { mechanism.authenticationIdentity.contentEquals(it.username) && mechanism.password.contentEquals(it.password) }) {
-                    return KmailAuthenticatedUser(mechanism.authorizationIdentity)
+                if (Config.accounts.any { mechanism.authenticationIdentity.contentEquals(it.email) && passVerify(mechanism.password, it.passwordHash) }) {
+                    return KmailAuthenticatedUser(mechanism.authenticationIdentity)
                 }
             }
         }

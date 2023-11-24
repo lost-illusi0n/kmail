@@ -1,15 +1,19 @@
 package dev.sitar.kmail.runner.storage.filesystems
 
-import dev.sitar.kmail.runner.KmailConfig
 import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.Attributes
 import java.io.File
 
-class LocalFileSystem(val config: KmailConfig.Mailbox.Filesystem.Local): FileSystem {
-    val root = File(config.dir)
+class LocalFileSystem(dir: String): FileSystem {
+    val root = File(dir)
 
     override suspend fun init() {
         root.mkdir()
+    }
+
+    fun readFile(name: String): ByteArray? {
+        val file = root.resolve(name)
+        return if (file.exists()) file.readBytes() else null
     }
 
     override fun folder(name: String): FsFolder {

@@ -14,6 +14,8 @@ Kmail is a lightweight mail server solution written in Kotlin. Instead of packin
 ### Prerequisites
 For a smooth experience, you will need to:
 - configure the [kmail.toml](kmail.toml) file
+- create an accounts file (e.g. `accounts.kmail`), and set it in the kmail config.
+    - each account is line seperated. account format is: `[email] [password-argon2-hash]`
 - generate certificates (a self-signed example is documented [here](GENERATING_CERT.md))
 
 ## Development

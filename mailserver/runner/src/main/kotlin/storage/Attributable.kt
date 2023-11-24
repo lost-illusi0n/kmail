@@ -14,4 +14,10 @@ interface Attributes {
         set(name, new)
         return new
     }
+
+    suspend fun remove(name: String, value: String): String {
+        val new = get(name).orEmpty().lines().filter { !it.contentEquals(value, ignoreCase = true) }.joinToString("\n")
+        set(name, new)
+        return new
+    }
 }
