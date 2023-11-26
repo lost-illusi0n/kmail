@@ -4,6 +4,8 @@ import dev.sitar.kio.Pool
 import dev.sitar.kio.Slice
 import dev.sitar.kio.buffers.Buffer
 import dev.sitar.kio.buffers.DefaultBufferPool
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.OutputStream
 
 class OutputStreamAsyncWriterStream(val outputStream: OutputStream) : AsyncWriterStream {
@@ -14,7 +16,7 @@ class OutputStreamAsyncWriterStream(val outputStream: OutputStream) : AsyncWrite
 
     override suspend fun writeBytes(slice: Slice): Int {
         val (arr, off, len) = slice
-        outputStream.write(arr, off, len)
+        withContext(Dispatchers.IO) { outputStream.write(arr, off, len) }
         return len
     }
 

@@ -5,6 +5,7 @@ import dev.sitar.kmail.agents.smtp.transfer.*
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.connection.ConnectionFactory
 import dev.sitar.kmail.utils.server.ServerSocketFactory
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow

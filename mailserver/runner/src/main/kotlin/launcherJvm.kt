@@ -4,7 +4,7 @@ import dev.sitar.kmail.utils.connection.TlsCapableConnectionFactory
 import dev.sitar.kmail.utils.server.TlsCapableServerSocketFactory
 import kotlinx.coroutines.coroutineScope
 
-suspend fun main(): Unit = coroutineScope {
+suspend fun main() {
     dns()
 
 //    System.setProperty("javax.net.debug", "all")

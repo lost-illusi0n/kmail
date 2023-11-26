@@ -12,7 +12,7 @@ kotlin {
 
     sourceSets["commonMain"].dependencies {
         api("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
-        implementation("dev.sitar:kio:1.1.1")
+        implementation("dev.sitar:kio:1.1.2")
     }
 
     sourceSets["commonTest"].dependencies {

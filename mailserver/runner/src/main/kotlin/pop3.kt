@@ -8,6 +8,7 @@ import dev.sitar.kmail.runner.storage.formats.Mailbox
 import dev.sitar.kmail.runner.storage.formats.MailboxMessage
 import dev.sitar.kmail.runner.storage.StorageLayer
 import dev.sitar.kmail.utils.server.ServerSocketFactory
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import mu.KotlinLogging

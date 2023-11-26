@@ -9,6 +9,7 @@ import dev.sitar.kmail.runner.storage.formats.MailboxFolder
 import dev.sitar.kmail.runner.storage.formats.MailboxMessage
 import dev.sitar.kmail.sasl.SaslChallenge
 import dev.sitar.kmail.utils.server.ServerSocketFactory
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
