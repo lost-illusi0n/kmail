@@ -110,9 +110,7 @@ data class KmailConfig(
         }
     }
 
-    data class Security(val certificates: List<CertificateAndKey>) {
-        data class CertificateAndKey(val certificate: String, val key: String)
-    }
+    data class Security(val keystore: String, val password: String)
     data class Smtp(
         val submission: Submission,
         val transfer: Transfer

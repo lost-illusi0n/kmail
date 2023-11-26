@@ -3,8 +3,13 @@ package dev.sitar.kmail.runner
 import dev.sitar.kmail.utils.connection.TlsCapableConnectionFactory
 import dev.sitar.kmail.utils.server.TlsCapableServerSocketFactory
 import kotlinx.coroutines.coroutineScope
+import mu.KotlinLogging
+
+private val logger = KotlinLogging.logger { }
 
 suspend fun main() {
+    logger.info { "Using JVM version: ${Runtime.version()}" }
+
     dns()
 
 //    System.setProperty("javax.net.debug", "all")
