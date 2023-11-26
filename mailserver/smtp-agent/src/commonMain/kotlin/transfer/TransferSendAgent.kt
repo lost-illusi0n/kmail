@@ -19,9 +19,9 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-//private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
-//private val dns = Dns(defaultServers = GOOGLE_DNS)
-private val dns = Dns(defaultServers = listOf(DnsServer("192.168.1.1")))
+private val GOOGLE_DNS = listOf("8.8.8.8", "8.8.4.4").map { DnsServer(it) } // Google's Public DNS
+private val dns = Dns(defaultServers = GOOGLE_DNS)
+//private val dns = Dns(defaultServers = listOf(DnsServer("192.168.1.1")))
 
 data class TransferConfig(
     val domain: Domain,
