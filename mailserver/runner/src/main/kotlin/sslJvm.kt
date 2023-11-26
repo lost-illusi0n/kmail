@@ -32,8 +32,29 @@ fun ssl(): Pair<SSLContext, KeyStore> {
 
     val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
     trustManagerFactory.init(keyStore)
+    val mine = trustManagerFactory.trustManagers.filterIsInstance<X509TrustManager>().first()
+    val default = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).also { it.init(null as KeyStore?) }.trustManagers.filterIsInstance<X509TrustManager>().first()
 
-    ssl.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
+    val trustManager = object: X509TrustManager {
+        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+            default.checkClientTrusted(chain, authType)
+        }
+
+        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
+            try {
+                mine.checkServerTrusted(chain, authType)
+            } catch (e: CertificateException) {
+                default.checkServerTrusted(chain, authType)
+            }
+        }
+
+        override fun getAcceptedIssuers(): Array<X509Certificate> {
+            return default.acceptedIssuers
+        }
+
+    }
+
+    ssl.init(keyManagerFactory.keyManagers, arrayOf(trustManager), null)
 
     logger.debug { "Generated SSL context." }
 
