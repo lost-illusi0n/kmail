@@ -15,6 +15,8 @@ import dev.sitar.kmail.smtp.Domain
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.smtp.Path
 import dev.sitar.kmail.utils.connection.KtorConnectionFactory
+import io.ktor.util.date.*
+import kotlinx.coroutines.delay
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -35,24 +37,19 @@ data class Proxy(val ip: String, val port: Int)
 class TransferSendConnection(
     transport: SmtpClientTransport,
     config: TransferConfig,
-    mail: InternetMessage,
-    rcpt: Path
+    outgoing: OutgoingMessage,
 ): ClientConnection(transport, config.domain) {
     override val objectives: Set<ClientObjective> = setOf(
         SecureObjective(this, config.requireEncryption),
-        MailObjective(this, mail, rcpt)
+        MailObjective(this, outgoing.message, outgoing.message.envelope.recipientAddresses.filter { it.mailbox.domain == outgoing.domain })
     )
 }
 
 // transfer server -> rcpt smtp server connection
 class TransferSendAgent(
     val config: TransferConfig,
-    val message: InternetMessage,
+    val outgoing: OutgoingMessage,
 ) {
-    suspend fun transfer() {
-        message.envelope.recipientAddresses.forEach { transferTo(it) }
-    }
-
     private suspend fun resolve(domain: Domain): List<String> {
         return when (domain) {
             is Domain.Actual -> {
@@ -73,13 +70,18 @@ class TransferSendAgent(
         }
     }
 
-    private suspend fun transferTo(rcpt: Path) {
+    suspend fun transfer(): OutgoingMessage? {
+        if (outgoing.time is When.Future) {
+            logger.debug { "waiting for ${outgoing.time.timestamp}ms before transferring" }
+            delay(outgoing.time.timestamp - getTimeMillis())
+        }
+
         val transport = if (config.proxy != null) {
             logger.debug { "Using proxy for transfer." }
 
             SmtpClientTransport(config.connector.connectionFactory.connect(config.proxy.ip, config.proxy.port))
         } else {
-            val mxRecords = resolve(rcpt.mailbox.domain)
+            val mxRecords = resolve(outgoing.domain)
 
             logger.debug { "Resolved ${mxRecords.size} MX records.${mxRecords.joinToString(prefix = "\n", separator = "\n")}" }
 
@@ -87,8 +89,18 @@ class TransferSendAgent(
                 ?: TODO("could not connect to any exchange servers")
         }
 
-        val client = TransferSendConnection(transport, config, message, rcpt)
+        val client = TransferSendConnection(transport, config, outgoing)
 
-        client.start()
+        return when (client.start()) {
+            ClientObjective.Result.Bad -> TODO()
+            ClientObjective.Result.Okay -> {
+                logger.debug { "successfully transferred $outgoing" }
+                null
+            }
+            ClientObjective.Result.RetryLater -> {
+                logger.debug { "asked to try again later, queueing with 2 minute delay $outgoing" }
+                OutgoingMessage(When.Future(getTimeMillis() + 2 * 60 * 1000), outgoing.domain, outgoing.message)
+            }
+        }
     }
 }

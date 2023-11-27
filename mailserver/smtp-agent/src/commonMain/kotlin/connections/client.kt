@@ -17,7 +17,7 @@ abstract class ClientConnection(
     val ehloObjective: EhloObjective by lazy { EhloObjective(this, domain) }
     abstract val objectives: Set<ClientObjective>
 
-    suspend fun start() {
+    suspend fun start(): ClientObjective.Result {
         // initial greet
         require(transport.recv().code is SmtpReplyCode.PositiveCompletion)
 
@@ -43,6 +43,8 @@ abstract class ClientConnection(
         logger.info { "Connection ${transport.connection.value.remote} has terminated." }
 
         transport.close()
+
+        return runner.lastResult
     }
 
     suspend fun recv(): SmtpReply.Raw {
@@ -62,12 +64,14 @@ class ObjectiveRunner(val objectives: List<ClientObjective>) {
 
     val isFinished get() = objectives.getOrNull(nextObjective) == null
 
+    var lastResult: ClientObjective.Result = ClientObjective.Result.Okay
+
     inline fun <reified T: ClientObjective> next() {
         nextObjective = objectives.indexOfFirst { it is T }
     }
 
     suspend fun step() {
-        with(current()) { begin() }
+        lastResult = with(current()) { begin() }
 
         currentObjective = nextObjective
         nextObjective++
@@ -83,18 +87,26 @@ interface ClientObjective {
 
     val isOptional: Boolean get() = true
 
-    suspend fun ObjectiveRunner.begin()
+    sealed interface Result {
+        object Okay: Result
+        object RetryLater: Result
+        object Bad: Result
+    }
+
+    suspend fun ObjectiveRunner.begin(): Result
 }
 
 class EhloObjective(override val client: ClientConnection, val domain: Domain): ClientObjective {
     lateinit var capabilities: List<String>
 
-    override suspend fun ObjectiveRunner.begin() {
+    override suspend fun ObjectiveRunner.begin(): ClientObjective.Result {
         client.transport.send(EhloCommand(domain))
 
         val ehlo = client.recv() deserializeAs EhloReply
 
         capabilities = ehlo.capabilities
+
+        return ClientObjective.Result.Okay
     }
 }
 
@@ -103,13 +115,13 @@ class SecureObjective(override val client: ClientConnection, requiresEncryption:
 
     override val isOptional: Boolean = !requiresEncryption
 
-    override suspend fun ObjectiveRunner.begin() {
-        if (client.transport.isSecure) return
+    override suspend fun ObjectiveRunner.begin(): ClientObjective.Result {
+        if (client.transport.isSecure) return ClientObjective.Result.Okay
 
         if ("STARTTLS" !in client.ehloObjective.capabilities) {
             if (!isOptional) TODO("encryption pls")
             logger.debug { "Continuing without encryption." }
-            return
+            return ClientObjective.Result.Okay
         }
 
         client.transport.send(StartTlsCommand)
@@ -121,31 +133,37 @@ class SecureObjective(override val client: ClientConnection, requiresEncryption:
         logger.debug { "Upgraded connection to TLS. ${System.currentTimeMillis()}"}
 
         next<EhloObjective>()
+
+        return ClientObjective.Result.Okay
     }
 }
 
-class MailObjective(override val client: ClientConnection, val message: InternetMessage, val rcpt: Path): ClientObjective {
-    override suspend fun ObjectiveRunner.begin() {
+class MailObjective(override val client: ClientConnection, val message: InternetMessage, val rcpts: List<Path>): ClientObjective {
+    override suspend fun ObjectiveRunner.begin(): ClientObjective.Result {
         client.transport.send(MailCommand(message.envelope.originatorAddress))
-        client.recv()
+        if (client.recv().code is SmtpReplyCode.TransientNegative) return ClientObjective.Result.RetryLater
 
-        client.transport.send(RecipientCommand(rcpt))
-        client.recv()
+        rcpts.forEach {
+            client.transport.send(RecipientCommand(it))
+            client.recv()
+        }
 
         client.transport.send(DataCommand)
-        client.recv()
+        if (client.recv().code is SmtpReplyCode.TransientNegative) return ClientObjective.Result.RetryLater
 
         client.transport.sendMessage(message.message)
-        client.recv()
+        if (client.recv().code is SmtpReplyCode.TransientNegative) return ClientObjective.Result.RetryLater
+
+        return ClientObjective.Result.Okay
     }
 }
 
 class QuitObjective(override val client: ClientConnection): ClientObjective {
-    private val logger = KotlinLogging.logger { }
-
-    override suspend fun ObjectiveRunner.begin() {
+    override suspend fun ObjectiveRunner.begin(): ClientObjective.Result.Okay {
         client.transport.send(QuitCommand)
         client.recv()
+
+        return ClientObjective.Result.Okay
     }
 }
 

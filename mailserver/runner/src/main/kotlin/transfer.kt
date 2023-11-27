@@ -17,7 +17,7 @@ private val logger = KotlinLogging.logger { }
 suspend fun transfer(
     serverFactory: ServerSocketFactory,
     connectionFactory: ConnectionFactory,
-    outgoingMessages: Flow<InternetMessage>,
+    outgoingMessages: OutgoingMessageQueue,
     incomingMessages: MutableSharedFlow<InternetMessage>
 ): TransferReceiveServer = coroutineScope {
     logger.info("SMTP transfer server is starting.")

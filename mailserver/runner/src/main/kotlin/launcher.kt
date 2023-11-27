@@ -1,5 +1,6 @@
 package dev.sitar.kmail.runner
 
+import dev.sitar.kmail.agents.smtp.transfer.OutgoingMessageQueue
 import dev.sitar.kmail.imap.agent.ImapAgent
 import dev.sitar.kmail.imap.agent.ImapLayer
 import dev.sitar.kmail.imap.agent.ImapMailbox
@@ -25,7 +26,7 @@ suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: Con
         logger.debug { "Detected following configuration: $Config" }
 
         val incoming = MutableSharedFlow<InternetMessage>()
-        val outgoing = MutableSharedFlow<InternetMessage>()
+        val outgoing = OutgoingMessageQueue()
 
         val mailbox = mailbox(incoming)
 

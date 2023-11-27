@@ -4,6 +4,7 @@ import dev.sitar.kmail.agents.smtp.submission.SmtpAuthenticatedUser
 import dev.sitar.kmail.agents.smtp.submission.SubmissionAuthenticationManager
 import dev.sitar.kmail.agents.smtp.submission.SubmissionConfig
 import dev.sitar.kmail.agents.smtp.submission.SubmissionServer
+import dev.sitar.kmail.agents.smtp.transfer.OutgoingMessageQueue
 import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.smtp.Path
@@ -18,7 +19,7 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun submission(factory: ServerSocketFactory, outgoing: MutableSharedFlow<InternetMessage>): SubmissionServer = coroutineScope {
+suspend fun submission(factory: ServerSocketFactory, outgoing: OutgoingMessageQueue): SubmissionServer = coroutineScope {
     logger.info("SMTP submission agent is starting.")
 
     val server = SubmissionServer(

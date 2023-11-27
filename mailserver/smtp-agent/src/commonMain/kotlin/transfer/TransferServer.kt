@@ -12,16 +12,12 @@ private val logger = KotlinLogging.logger { }
 
 class TransferServer(
     val config: TransferConfig,
-    val outgoingMail: Flow<InternetMessage>
+    val queue: OutgoingMessageQueue
 ) {
     suspend fun handle() {
         supervisorScope {
-            outgoingMail.collect {
-                logger.info { "Beginning transfer of ${it.queueId}: $it" }
-
-                launch {
-                    TransferSendAgent(config, it).transfer()
-                }
+            queue.collect(this) {
+                TransferSendAgent(config, it).transfer()
             }
         }
     }
