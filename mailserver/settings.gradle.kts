@@ -23,3 +23,10 @@ pluginManagement {
         }
     }
 }
+
+// TODO: publish latest kio
+includeBuild("../../kio") {
+    dependencySubstitution {
+        substitute(module("dev.sitar:kio:1.1.2")).using(project(":"))
+    }
+}

@@ -3,12 +3,13 @@ package dev.sitar.kmail.agents.smtp.transports.server
 import dev.sitar.keystone.Pipeline
 import dev.sitar.keystone.Stage
 import dev.sitar.kmail.smtp.SmtpCommand
+import kotlin.Exception
 
 sealed interface SmtpCommandContext {
     var continuePropagation: Boolean
 
     data class Known(val command: SmtpCommand, override var continuePropagation: Boolean): SmtpCommandContext
-    class Unknown(override var continuePropagation: Boolean): SmtpCommandContext
+    class Unknown(val cause: Exception, override var continuePropagation: Boolean): SmtpCommandContext
 }
 
 class SmtpCommandPipeline: Pipeline<SmtpCommandContext>(setOf(Logging, Global, Process), onFilter = { it.continuePropagation }) {

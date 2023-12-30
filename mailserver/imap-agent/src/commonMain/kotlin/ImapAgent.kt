@@ -2,6 +2,7 @@ package dev.sitar.kmail.imap.agent
 
 import dev.sitar.kmail.imap.Capability
 import dev.sitar.kmail.imap.agent.transports.ImapServerTransport
+import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.imap.frames.Tag
 import dev.sitar.kmail.imap.frames.command.*
 import dev.sitar.kmail.imap.frames.response.*
@@ -103,6 +104,7 @@ sealed interface State {
                 StartTlsCommand -> {
                     agent.transport.send(tag + OkResponse(text = "Let the TLS negotiations begin."))
                     agent.transport.secure()
+                    logger.debug { "secured ${agent.transport.commandPipeline}" }
                 }
                 is AuthenticateCommand -> {
                     require(command.mechanism is SaslMechanism.Plain)
@@ -118,6 +120,7 @@ sealed interface State {
                         agent.transport.send(tag + OkResponse(text = "authenticated."))
                         agent.state = Authenticated(agent, mailbox)
                     } else {
+                        logger.debug { "user ${challenge.authenticationIdentity} failed to authenticate."}
                         TODO("not authenticated")
                     }
                 }
@@ -250,10 +253,18 @@ sealed interface State {
                 is FetchCommand -> {
                     fetch(context.command.tag, command)
                 }
+                is StoreCommand -> {
+                    store(context.command.tag, command)
+                }
+                is CopyCommand -> {
+                    copy(context.command.tag, command)
+                }
                 is UidCommand -> {
                     when (val form = command.command) {
                         is FetchCommand -> fetch(context.command.tag, form)
-                        else -> error("shouldnt happen, it wouldnt get deserialized.")
+                        is StoreCommand -> store(context.command.tag, form)
+                        is CopyCommand -> copy(context.command.tag, form)
+                        else -> throw Exception("shouldnt happen, it wont get deserialized.")
                     }
                 }
                 is CheckCommand -> {
@@ -269,6 +280,35 @@ sealed interface State {
             }
 
             agent.transport.send(tag + OkResponse(text = "Here is your mail."))
+        }
+
+        private suspend fun store(tag: Tag, command: StoreCommand) {
+            val resp = folder.store(command.sequence, command.item.flags.map { Flag.fromValue(it) }.toSet(), command.item.mode)
+
+            if (!command.item.silent) {
+                resp.forEach {
+                    agent.transport.send(Tag.Untagged + FetchResponse(it.key, setOf(DataItem.Response.Flags(it.value.map(Flag::value)))))
+                }
+            }
+
+            agent.transport.send(tag + OkResponse(text = "Stored new flags."))
+        }
+
+        private suspend fun copy(tag: Tag, command: CopyCommand) {
+            val messages = folder.sequenceToMessages(command.sequence)
+
+            val copy = authenticated.mailbox.folder(command.mailbox)
+
+            if (copy == null) {
+                agent.transport.send(tag + BadResponse(text = "[TRYCREATE] dest doesn't exist."))
+                return
+            }
+
+            messages.forEach {
+                copy.save(it.flags, it.typedMessage().asText())
+            }
+
+            agent.transport.send(tag + OkResponse(text = "copy done."))
         }
     }
     class Logout(): State {

@@ -4,10 +4,8 @@ import dev.sitar.kmail.agents.smtp.transfer.OutgoingMessageQueue
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.server.ServerSocket
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -17,9 +15,11 @@ class SubmissionServer(
     val config: SubmissionConfig,
     val outgoing: OutgoingMessageQueue
 ) {
-    suspend fun listen() {
-        supervisorScope {
-            while (isActive) {
+    suspend fun listen() = supervisorScope {
+        logger.debug { "Submission SMTP server is listening." }
+
+        while (isActive) {
+            withContext(Dispatchers.IO) {
                 val transport = SmtpServerTransport(socket.accept())
 
                 logger.debug { "Accepted a connection from ${transport.remote}." }

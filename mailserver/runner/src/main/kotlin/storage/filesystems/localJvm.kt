@@ -2,7 +2,10 @@ package dev.sitar.kmail.runner.storage.filesystems
 
 import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.Attributes
+import mu.KotlinLogging
 import java.io.File
+
+private val logger = KotlinLogging.logger { }
 
 class LocalFileSystem(dir: String): FileSystem {
     val root = File(dir)
@@ -46,6 +49,8 @@ class LocalFolder(val file: File): FsFolder, Attributable {
     }
 
     override suspend fun createFolder(name: String): FsFolder {
+        logger.trace { "creating folder $name in ${file.path}" }
+
         return LocalFolder(file.resolve(name).also { it.mkdir() })
     }
 
@@ -63,10 +68,14 @@ class LocalFolder(val file: File): FsFolder, Attributable {
     }
 
     override suspend fun readFile(name: String): ByteArray? {
+        logger.trace { "reading from $name in ${file.path}" }
+
         return file.resolve(name).takeIf { it.exists() }?.readBytes()
     }
 
     override suspend fun writeFile(name: String, contents: ByteArray): FsFile {
+        logger.trace { "writing to $name in ${file.path}" }
+
         val file = file.resolve(name).also { it.createNewFile() }
         file.writeBytes(contents)
         return FsFile(file.name, file.length())
@@ -75,10 +84,13 @@ class LocalFolder(val file: File): FsFolder, Attributable {
     override suspend fun move(file: String, folder: FsFolder) {
         require(folder is LocalFolder)
 
+        logger.trace { "moving $file from ${this.file.path} to ${folder.file.path}" }
+
         this.file.resolve(file).renameTo(folder.file.resolve(file))
     }
 
     override suspend fun rename(from: String, to: String) {
+        logger.trace { "renaming $from to $to in ${file.path}" }
         file.resolve(from).renameTo(file.resolve(to))
     }
 }

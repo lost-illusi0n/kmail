@@ -30,8 +30,7 @@ class OutgoingMessageQueue {
 
     // TODO: we should store messages in transit (in case of failure/loss) until a new entry is received
     suspend fun collect(scope: CoroutineScope, block: suspend (OutgoingMessage) -> OutgoingMessage?) {
-        outgoing
-            .collect {
+        outgoing.collect {
                 logger.debug { "queue selected $it" }
 
                 scope.launch {

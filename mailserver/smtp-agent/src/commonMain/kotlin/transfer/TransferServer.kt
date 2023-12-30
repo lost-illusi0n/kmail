@@ -14,11 +14,11 @@ class TransferServer(
     val config: TransferConfig,
     val queue: OutgoingMessageQueue
 ) {
-    suspend fun handle() {
-        supervisorScope {
-            queue.collect(this) {
-                TransferSendAgent(config, it).transfer()
-            }
+    suspend fun handle() = supervisorScope {
+        logger.info("SMTP transfer server is listening.")
+
+        queue.collect(this) {
+            TransferSendAgent(config, it).transfer()
         }
     }
 }

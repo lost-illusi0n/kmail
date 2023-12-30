@@ -19,19 +19,14 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun submission(factory: ServerSocketFactory, outgoing: OutgoingMessageQueue): SubmissionServer = coroutineScope {
+suspend fun submission(factory: ServerSocketFactory, outgoing: OutgoingMessageQueue) {
     logger.info("SMTP submission agent is starting.")
 
-    val server = SubmissionServer(
+    SubmissionServer(
         factory.bind(Config.smtp.submission.port),
         SubmissionConfig(Config.domains.first(), requiresEncryption = true, KmailAuthenticationManager),
         outgoing
-    )
-    launch { server.listen() }
-
-    logger.info("SMTP submission agent has started.")
-
-    server
+    ).listen()
 }
 
 data class KmailAuthenticatedUser(val email: String) : SmtpAuthenticatedUser

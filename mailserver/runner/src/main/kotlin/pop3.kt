@@ -15,15 +15,10 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun pop3(socket: ServerSocketFactory, layer: Pop3Layer): Pop3Server = coroutineScope {
+suspend fun pop3(socket: ServerSocketFactory, layer: Pop3Layer) {
     logger.info("Starting Pop3 server.")
 
-    val server = Pop3Server(socket.bind(POP3_SERVER), layer)
-    launch { server.listen() }
-
-    logger.info("Started Pop3 server.")
-
-    server
+    Pop3Server(socket.bind(POP3_SERVER), layer).listen()
 }
 
 class KmailPop3Layer(val storage: StorageLayer): Pop3Layer {

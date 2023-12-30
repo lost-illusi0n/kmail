@@ -185,7 +185,7 @@ private val logger = KotlinLogging.logger { }
 class MaildirMessage(var fileName: String, override val length: Long, var folder: FsFolder, val mailbox: Maildir): MailboxMessage {
     override val name: String = fileName.split(':').first()
 
-    override val flags: Set<Flag> = MaildirUniqueName(fileName).flags.toSet()
+    override val flags: Set<Flag> get() = MaildirUniqueName(fileName).flags.toSet()
 
     override suspend fun updateFlags(flags: Set<Flag>) {
         if (Flag.Seen in flags) {

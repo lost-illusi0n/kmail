@@ -21,7 +21,7 @@ fun ssl(): Pair<SSLContext, KeyStore> {
     keyStore.load(FileInputStream(Config.security.keystore), Config.security.password.toCharArray())
 
     logger.debug { "Generating SSL context." }
-    val ssl = SSLContext.getInstance("TLS")
+    val ssl = SSLContext.getInstance("TLSv1.3")
 
     val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
     keyManagerFactory.init(keyStore, Config.security.password.toCharArray())

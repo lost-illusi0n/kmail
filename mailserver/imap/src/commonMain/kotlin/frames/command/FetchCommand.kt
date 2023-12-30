@@ -44,6 +44,6 @@ data class FetchCommand(val sequence: Sequence, val dataItems: List<DataItem.Fet
         }
 
         override suspend fun deserialize(input: AsyncReader): FetchCommand =
-            deserialize(mode = Sequence.Mode.SequenceNumber, input)
+            deserialize(mode = Sequence.Mode.Sequence, input)
     }
 }

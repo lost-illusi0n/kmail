@@ -3,8 +3,8 @@ package dev.sitar.kmail.imap.agent
 import dev.sitar.kmail.imap.PartSpecifier
 import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.imap.frames.DataItem
+import dev.sitar.kmail.imap.frames.command.StoreMode
 import dev.sitar.kmail.message.Message
-import java.util.Collections
 import kotlin.math.max
 import kotlin.math.min
 
@@ -79,62 +79,18 @@ interface ImapFolder {
 
     suspend fun save(flags: Set<Flag>, message: String)
 
-    suspend fun update(pos: Int, mode: Sequence.Mode, flags: Set<Flag>)
+    suspend fun store(sequence: Sequence, flags: Set<Flag>, mode: StoreMode, messagesSnapshot: List<ImapMessage>? = null): Map<Int, Set<Flag>>
 
     suspend fun fetch(sequence: Sequence, dataItems: List<DataItem.Fetch>): Map<Int, Set<DataItem.Response>> {
         val messagesSnapshot = messages()
 
-        val start = when (sequence) {
-            is Sequence.Set -> with(sequence.start) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> TODO()
-                }
-            }
-            is Sequence.Single -> with(sequence.pos) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> TODO()
-                }
-            }
-        }
+        val selectedMessages = sequenceToMessages(sequence, messagesSnapshot).takeIf { it.isNotEmpty() } ?: return emptyMap()
 
-        val end = when (sequence) {
-            is Sequence.Set -> with(sequence.end) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> messagesSnapshot.size
-                }
-            }
-            is Sequence.Single -> with(sequence.pos) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> TODO()
-                }
-            }
-        }
-
-        val exists = exists()
-
-        if (!(start in 0..exists && end in 0..exists)) return emptyMap()
-
-        val selectedMessages = when (sequence.mode) {
-            Sequence.Mode.SequenceNumber -> {
-                messagesSnapshot.subList(messagesSnapshot.size - end, messagesSnapshot.size + 1 - start)
-            }
-            Sequence.Mode.Uid -> {
-                val a = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == start }
-                val b = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == end }
-
-                val start = min(a, b)
-                val end = max(a, b)
-                messagesSnapshot.subList(start, end + 1)
-            }
-        }
+        if (dataItems.any { it is DataItem.Fetch.Body }) store(sequence, setOf(Flag.Seen), StoreMode.Add, messagesSnapshot = messagesSnapshot)
 
         return selectedMessages.associate { message ->
             val pos = when (sequence.mode) {
-                Sequence.Mode.SequenceNumber -> message.sequenceNumber
+                Sequence.Mode.Sequence -> message.sequenceNumber
                 Sequence.Mode.Uid -> message.uniqueIdentifier
             }
 
@@ -149,8 +105,6 @@ interface ImapFolder {
                     DataItem.Fetch.Rfc822Size -> add(DataItem.Response.Rfc822Size(message.size))
                     DataItem.Fetch.Uid -> add(DataItem.Response.Uid(message.uniqueIdentifier.toString()))
                     is DataItem.Fetch.BodyType -> {
-                        if (item is DataItem.Fetch.Body) update(pos, sequence.mode, setOf(Flag.Seen))
-
                         val typed = message.typedMessage()
 
                         if (item.parts.isEmpty()) {
@@ -182,6 +136,64 @@ interface ImapFolder {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    suspend fun sequenceToMessages(
+        sequence: Sequence,
+        messagesSnapshot: List<ImapMessage>? = null
+    ): List<ImapMessage> {
+        val messagesSnapshot = messagesSnapshot ?: messages()
+
+        val start = when (sequence) {
+            is Sequence.Set -> with(sequence.start) {
+                when (this) {
+                    is Sequence.Position.Actual -> pos
+                    Sequence.Position.Any -> TODO()
+                }
+            }
+
+            is Sequence.Single -> with(sequence.pos) {
+                when (this) {
+                    is Sequence.Position.Actual -> pos
+                    Sequence.Position.Any -> TODO()
+                }
+            }
+        }
+
+        val end = when (sequence) {
+            is Sequence.Set -> with(sequence.end) {
+                when (this) {
+                    is Sequence.Position.Actual -> pos
+                    Sequence.Position.Any -> messagesSnapshot.size
+                }
+            }
+
+            is Sequence.Single -> with(sequence.pos) {
+                when (this) {
+                    is Sequence.Position.Actual -> pos
+                    Sequence.Position.Any -> TODO()
+                }
+            }
+        }
+
+        val exists = exists()
+
+        if (!(start in 0..exists && end in 0..exists)) return listOf()
+
+        return when (sequence.mode) {
+            Sequence.Mode.Sequence -> {
+                messagesSnapshot.subList(messagesSnapshot.size - end, messagesSnapshot.size + 1 - start)
+            }
+
+            Sequence.Mode.Uid -> {
+                val a = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == start }
+                val b = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == end }
+
+                val start = min(a, b)
+                val end = max(a, b)
+                messagesSnapshot.subList(start, end + 1)
             }
         }
     }

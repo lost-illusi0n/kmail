@@ -25,6 +25,8 @@ data class UidCommand(val command: ImapCommand): ImapCommand {
 
             val command = when (ImapCommand.Identifier.findByIdentifier(identifier)) {
                 ImapCommand.Identifier.Fetch -> FetchCommand.deserialize(Sequence.Mode.Uid, input)
+                ImapCommand.Identifier.Store -> StoreCommand.deserialize(Sequence.Mode.Uid, input)
+                ImapCommand.Identifier.Copy -> CopyCommand.deserialize(Sequence.Mode.Uid, input)
                 // ImapCommand.Identifier.Search
                 else -> TODO("got $identifier")
             }

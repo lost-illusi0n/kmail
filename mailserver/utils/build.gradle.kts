@@ -17,4 +17,9 @@ kotlin {
         api("io.ktor:ktor-network:2.1.3")
         api("io.ktor:ktor-network-tls:2.1.3")
     }
+
+    sourceSets["jvmMain"].dependencies {
+        implementation("io.netty:netty-all:4.1.101.Final")
+
+    }
 }

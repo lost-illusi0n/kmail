@@ -29,7 +29,7 @@ abstract class ServerConnection(val transport: SmtpServerTransport, private val 
                 when (this) {
                     is SmtpCommandContext.Known -> logger.trace { "FROM ${transport.remote}: $command" }
                     is SmtpCommandContext.Unknown -> {
-                        logger.warn { "FROM ${transport.remote}: unknown!" }
+                        logger.warn(cause) { "FROM ${transport.remote}: unknown!" }
                         continuePropagation = false
                         transport.send(SmtpReply.PermanentNegative.Default(code = 500))
                         close()

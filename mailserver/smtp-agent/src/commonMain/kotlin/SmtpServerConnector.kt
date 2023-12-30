@@ -37,7 +37,7 @@ interface SmtpServerConnector {
 
 class DefaultTransferSessionSmtpConnector(
     override val connectionFactory: ConnectionFactory,
-    override val timeout: Long = 500
+    override val timeout: Long = 2000
 ) : SmtpServerConnector {
     companion object {
         val STANDARD_PORTS: Set<Int> = setOf(

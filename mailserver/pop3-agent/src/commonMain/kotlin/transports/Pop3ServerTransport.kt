@@ -24,9 +24,13 @@ class Pop3ServerTransport(val connection: Connection) {
 
     suspend fun startPipeline() = coroutineScope {
         while (isActive && reader.openForRead) {
-            val command = reader.readCommand()
-            val context = Pop3CommandContext(command, false)
-            commandPipeline.process(context)
+            try {
+                val command = reader.readCommand()
+                val context = Pop3CommandContext(command, false)
+                commandPipeline.process(context)
+            } catch (e: Exception) {
+                logger.error(e) { "pop3 transport stream encountered exception." }
+            }
         }
     }
 

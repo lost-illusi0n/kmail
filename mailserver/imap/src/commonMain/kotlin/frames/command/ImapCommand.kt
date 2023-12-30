@@ -24,7 +24,9 @@ sealed interface ImapCommand {
         Notify(NotifyCommand),
         Idle(IdleCommand),
         Check(CheckCommand),
-        Append(AppendCommand);
+        Append(AppendCommand),
+        Store(StoreCommand),
+        Copy(CopyCommand);
 
         companion object {
             fun findByIdentifier(identifier: String) : Identifier? {

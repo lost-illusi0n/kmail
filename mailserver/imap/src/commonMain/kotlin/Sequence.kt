@@ -11,7 +11,7 @@ sealed class Sequence {
     data class Set(val start: Position, val end: Position, override val mode: Mode): Sequence()
 
     enum class Mode {
-        SequenceNumber,
+        Sequence,
         Uid
     }
 

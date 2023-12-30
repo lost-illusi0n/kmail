@@ -14,37 +14,36 @@ import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
-suspend fun transfer(
+fun CoroutineScope.transfer(
     serverFactory: ServerSocketFactory,
     connectionFactory: ConnectionFactory,
     outgoingMessages: OutgoingMessageQueue,
     incomingMessages: MutableSharedFlow<InternetMessage>
-): TransferReceiveServer = coroutineScope {
+) {
     logger.info("SMTP transfer server is starting.")
 
-    val server = TransferServer(
-        TransferConfig(
-            Config.domains.first(),
-            requireEncryption = Config.smtp.transfer.encryption,
-            proxy = Config.proxy?.intoSmtpProxy(),
-            connector = DefaultTransferSessionSmtpConnector(connectionFactory)
-        ), outgoingMessages
-    )
-    launch { server.handle() }
+    launch {
+        val server = TransferServer(
+            TransferConfig(
+                Config.domains.first(),
+                requireEncryption = Config.smtp.transfer.encryption,
+                proxy = Config.proxy?.intoSmtpProxy(),
+                connector = DefaultTransferSessionSmtpConnector(connectionFactory)
+            ), outgoingMessages
+        )
 
-    logger.info("SMTP transfer server has started.")
+        server.handle()
+    }
 
     logger.info("SMTP receive server is starting.")
 
-    val receiveServer = TransferReceiveServer(
-        serverFactory.bind(Config.smtp.transfer.port),
-        TransferReceiveConfig(Config.domains.first(), requiresEncryption = true, Config.accounts.map { it.email }),
-        incomingMessages
-    )
+    launch {
+        val receiveServer = TransferReceiveServer(
+            serverFactory.bind(Config.smtp.transfer.port),
+            TransferReceiveConfig(Config.domains.first(), requiresEncryption = true, Config.accounts.map { it.email }),
+            incomingMessages
+        )
 
-    launch { receiveServer.listen() }
-
-    logger.info("SMTP receive server has started.")
-
-    receiveServer
+        receiveServer.listen()
+    }
 }

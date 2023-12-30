@@ -48,7 +48,7 @@ class SmtpServerTransport(connection: Connection, coroutineContext: CoroutineCon
                     val command = lock.withLock { reader.readSmtpCommand() }
                     SmtpCommandContext.Known(command, true)
                 } catch (e: Exception) {
-                    SmtpCommandContext.Unknown(true)
+                    SmtpCommandContext.Unknown(e, true)
                 }
 
                 commandPipeline.process(context)

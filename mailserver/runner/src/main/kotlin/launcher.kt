@@ -9,17 +9,19 @@ import dev.sitar.kmail.imap.agent.transports.ImapServerTransport
 import dev.sitar.kmail.runner.storage.mailbox
 import dev.sitar.kmail.sasl.SaslChallenge
 import dev.sitar.kmail.smtp.InternetMessage
+import dev.sitar.kmail.utils.ExceptionLoggingCoroutineExceptionHandler
 import dev.sitar.kmail.utils.connection.ConnectionFactory
 import dev.sitar.kmail.utils.server.ServerSocketFactory
 import kotlinx.coroutines.*
+import kotlinx.coroutines.debug.DebugProbes
 import kotlinx.coroutines.flow.MutableSharedFlow
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
 
 @OptIn(FlowPreview::class)
-suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: ConnectionFactory) = supervisorScope {
-    withContext(CoroutineExceptionHandler { coroutineContext, throwable -> logger.error(throwable) { } }) {
+suspend fun run(serverSocketFactory: ServerSocketFactory, connectionFactory: ConnectionFactory) = coroutineScope {
+    withContext(ExceptionLoggingCoroutineExceptionHandler(logger)) {
         println(KMAIL_ASCII)
         logger.info("Kmail is starting.")
 

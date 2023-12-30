@@ -22,6 +22,8 @@ kotlin {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-debug:1.4.0")
+
     implementation("io.github.microutils:kotlin-logging:3.0.2")
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:2.19.0")
     implementation("org.apache.logging.log4j:log4j-core:2.19.0")

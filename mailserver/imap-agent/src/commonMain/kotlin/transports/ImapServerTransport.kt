@@ -31,9 +31,14 @@ class ImapServerTransport(var connection: Connection) {
 
     suspend fun startPipeline() = coroutineScope {
         while (isActive && reader.openForRead) {
-            val command = reader.readCommand()
-            val context = ImapCommandContext(command, false)
-            commandPipeline.process(context)
+            try {
+                val command = reader.readCommand()
+                val context = ImapCommandContext(command, false)
+
+                commandPipeline.process(context)
+            } catch (e: Exception) {
+                logger.error(e) { "imap transport stream encountered exception." }
+            }
         }
     }
 
