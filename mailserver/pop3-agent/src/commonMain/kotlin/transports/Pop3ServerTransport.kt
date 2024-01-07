@@ -6,10 +6,7 @@ import dev.sitar.kmail.pop3.io.asPop3ServerReader
 import dev.sitar.kmail.pop3.io.asPop3ServerWriter
 import dev.sitar.kmail.pop3.replies.Pop3Reply
 import dev.sitar.kmail.utils.connection.Connection
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -30,6 +27,8 @@ class Pop3ServerTransport(val connection: Connection) {
                 commandPipeline.process(context)
             } catch (e: Exception) {
                 logger.error(e) { "pop3 transport stream encountered exception." }
+
+                cancel()
             }
         }
     }

@@ -13,6 +13,7 @@ import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.utils.connection.Connection
 import dev.sitar.kmail.utils.io.readStringUtf8
 import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import mu.KotlinLogging
@@ -38,6 +39,8 @@ class ImapServerTransport(var connection: Connection) {
                 commandPipeline.process(context)
             } catch (e: Exception) {
                 logger.error(e) { "imap transport stream encountered exception." }
+
+                cancel()
             }
         }
     }
