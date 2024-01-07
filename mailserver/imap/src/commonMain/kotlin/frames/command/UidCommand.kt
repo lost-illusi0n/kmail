@@ -3,6 +3,7 @@ package dev.sitar.kmail.imap.frames.command
 import dev.sitar.kio.async.readers.AsyncReader
 import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.utils.io.readUtf8StringUntil
+import dev.sitar.kmail.utils.todo
 
 data class UidCommand(val command: ImapCommand): ImapCommand {
     override val identifier: ImapCommand.Identifier = ImapCommand.Identifier.Uid
@@ -28,7 +29,7 @@ data class UidCommand(val command: ImapCommand): ImapCommand {
                 ImapCommand.Identifier.Store -> StoreCommand.deserialize(Sequence.Mode.Uid, input)
                 ImapCommand.Identifier.Copy -> CopyCommand.deserialize(Sequence.Mode.Uid, input)
                 // ImapCommand.Identifier.Search
-                else -> TODO("got $identifier")
+                else -> todo("got $identifier")
             }
 
             return UidCommand(command)

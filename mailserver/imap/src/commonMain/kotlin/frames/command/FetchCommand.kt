@@ -5,6 +5,7 @@ import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
+import dev.sitar.kmail.utils.todo
 
 data class FetchCommand(val sequence: Sequence, val dataItems: List<DataItem.Fetch>) : ImapCommand {
     override val identifier: ImapCommand.Identifier = ImapCommand.Identifier.Fetch
@@ -18,7 +19,7 @@ data class FetchCommand(val sequence: Sequence, val dataItems: List<DataItem.Fet
             val items = if (char != '('.code.toByte()) {
                 val identifier = input.readUtf8StringUntil { it == ' ' || it == '[' }
 
-                val typed = DataItem.Identifier.from("${char.toInt().toChar()}$identifier") ?: TODO("unknown data item: $identifier")
+                val typed = DataItem.Identifier.from("${char.toInt().toChar()}$identifier") ?: todo("unknown data item: $identifier")
 
                 listOf(typed.fetchSerializer.deserialize(input))
             } else buildList {
@@ -32,13 +33,13 @@ data class FetchCommand(val sequence: Sequence, val dataItems: List<DataItem.Fet
 
                     if (identifier == "") break
 
-                    val typed = DataItem.Identifier.from(identifier) ?: TODO("unknown data item: $identifier")
+                    val typed = DataItem.Identifier.from(identifier) ?: todo("unknown data item: $identifier")
 
                     add(typed.fetchSerializer.deserialize(input))
                 }
             }
 
-            if (input.readUtf8UntilLineEnd() != "") TODO("syntax error")
+            if (input.readUtf8UntilLineEnd() != "") todo("syntax error")
 
             return FetchCommand(sequence, items)
         }

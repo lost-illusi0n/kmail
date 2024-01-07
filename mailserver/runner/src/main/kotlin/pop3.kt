@@ -8,6 +8,7 @@ import dev.sitar.kmail.runner.storage.formats.Mailbox
 import dev.sitar.kmail.runner.storage.formats.MailboxMessage
 import dev.sitar.kmail.runner.storage.StorageLayer
 import dev.sitar.kmail.utils.server.ServerSocketFactory
+import dev.sitar.kmail.utils.todo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -46,7 +47,7 @@ class KmailPop3Message(val message: MailboxMessage) : Pop3Message {
     override suspend fun getContent(): String = message.getMessage().asText()
 
     override fun delete() {
-        TODO("Not yet implemented")
+        todo()
     }
 }
 
@@ -64,6 +65,6 @@ class KmailPop3Maildrop(private val mailbox: Mailbox) : Pop3Maildrop {
     }
 
     override fun commit() {
-        TODO()
+        todo()
     }
 }

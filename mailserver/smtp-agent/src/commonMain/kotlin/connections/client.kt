@@ -6,6 +6,7 @@ import dev.sitar.kmail.smtp.frames.reply.EhloReply
 import dev.sitar.kmail.smtp.frames.reply.SmtpReply
 import dev.sitar.kmail.smtp.frames.reply.SmtpReplyCode
 import dev.sitar.kmail.smtp.frames.reply.SmtpReplyDeserializer
+import dev.sitar.kmail.utils.todo
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger { }
@@ -33,7 +34,7 @@ abstract class ClientConnection(
             try {
                 runner.step()
             } catch (e: Exception) {
-                TODO("failed objective")
+                todo("failed objective")
             }
         }
 
@@ -52,8 +53,8 @@ abstract class ClientConnection(
 
         return when (reply.code) {
             is SmtpReplyCode.PositiveCompletion, is SmtpReplyCode.PositiveIntermediate -> reply
-            is SmtpReplyCode.TransientNegative -> TODO()
-            is SmtpReplyCode.PermanentNegative -> TODO()
+            is SmtpReplyCode.TransientNegative -> todo()
+            is SmtpReplyCode.PermanentNegative -> todo()
         }
     }
 }
@@ -119,7 +120,7 @@ class SecureObjective(override val client: ClientConnection, requiresEncryption:
         if (client.transport.isSecure) return ClientObjective.Result.Okay
 
         if ("STARTTLS" !in client.ehloObjective.capabilities) {
-            if (!isOptional) TODO("encryption pls")
+            if (!isOptional) todo("encryption pls")
             logger.debug { "Continuing without encryption." }
             return ClientObjective.Result.Okay
         }

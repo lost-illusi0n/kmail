@@ -15,6 +15,7 @@ import dev.sitar.kmail.smtp.Domain
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.smtp.Path
 import dev.sitar.kmail.utils.connection.KtorConnectionFactory
+import dev.sitar.kmail.utils.todo
 import io.ktor.util.date.*
 import kotlinx.coroutines.delay
 import mu.KotlinLogging
@@ -86,13 +87,13 @@ class TransferSendAgent(
             logger.debug { "Resolved ${mxRecords.size} MX records.${mxRecords.joinToString(prefix = "\n", separator = "\n")}" }
 
             mxRecords.firstNotNullOfOrNull { config.connector.connect(it) }
-                ?: TODO("could not connect to any exchange servers")
+                ?: todo("could not connect to any exchange servers")
         }
 
         val client = TransferSendConnection(transport, config, outgoing)
 
         return when (client.start()) {
-            ClientObjective.Result.Bad -> TODO()
+            ClientObjective.Result.Bad -> todo()
             ClientObjective.Result.Okay -> {
                 logger.debug { "successfully transferred $outgoing" }
                 null

@@ -8,6 +8,7 @@ import dev.sitar.kmail.imap.frames.command.*
 import dev.sitar.kmail.imap.frames.response.*
 import dev.sitar.kmail.sasl.SaslChallenge
 import dev.sitar.kmail.sasl.SaslMechanism
+import dev.sitar.kmail.utils.todo
 import io.ktor.util.*
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
@@ -121,7 +122,7 @@ sealed interface State {
                         agent.state = Authenticated(agent, mailbox)
                     } else {
                         logger.debug { "user ${challenge.authenticationIdentity} failed to authenticate."}
-                        TODO("not authenticated")
+                        todo("not authenticated")
                     }
                 }
                 else -> context.wasProcessed = false
@@ -149,7 +150,7 @@ sealed interface State {
 
                         agent.state = Selected(agent, this, folder)
                     } else {
-                        TODO("bad folder")
+                        todo("bad folder")
                     }
                 }
 //                EXAMINE,
@@ -213,7 +214,7 @@ sealed interface State {
 
                     val message = agent.transport.readMessage(command.messageSize)
 
-                    val folder = mailbox.folder(command.mailbox) ?: TODO("folder doesnt exist")
+                    val folder = mailbox.folder(command.mailbox) ?: todo("folder doesnt exist")
 
                     val flags = command.flags.orEmpty().map { Flag.fromValue(it) }
                         .filter {
@@ -313,7 +314,7 @@ sealed interface State {
     }
     class Logout(): State {
         override suspend fun handle(context: ImapCommandContext) {
-            TODO("Not yet implemented")
+            todo()
         }
     }
 

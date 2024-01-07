@@ -6,6 +6,7 @@ import dev.sitar.kmail.utils.io.readStringUtf8
 import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
 import dev.sitar.kmail.utils.io.writeLineEnd
 import dev.sitar.kmail.utils.io.writeStringUtf8
+import dev.sitar.kmail.utils.todo
 
 public enum class SmtpCommandTag(public val serializer: SmtpCommandSerializer<*>) {
     Helo(HeloCommand.Serializer),
@@ -77,9 +78,9 @@ public data class MailCommand(val from: Path /* params */) : SmtpCommand {
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): MailCommand {
-            if (input.readStringUtf8(5) != "FROM:") TODO("incorrect syntax")
+            if (input.readStringUtf8(5) != "FROM:") todo("incorrect syntax")
 
-            val path = Path.fromText(input.readUtf8UntilLineEnd()) ?: TODO("incorrect syntax")
+            val path = Path.fromText(input.readUtf8UntilLineEnd()) ?: todo("incorrect syntax")
 
             return MailCommand(path)
         }
@@ -97,9 +98,9 @@ public data class RecipientCommand(val to: Path /* params */) : SmtpCommand {
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): RecipientCommand {
-            if (input.readStringUtf8(3) != "TO:") TODO("incorrect syntax")
+            if (input.readStringUtf8(3) != "TO:") todo("incorrect syntax")
 
-            val path = Path.fromText(input.readUtf8UntilLineEnd()) ?: TODO("incorrect syntax")
+            val path = Path.fromText(input.readUtf8UntilLineEnd()) ?: todo("incorrect syntax")
 
             return RecipientCommand(path)
         }

@@ -11,6 +11,7 @@ import dev.sitar.kmail.smtp.Domain
 import dev.sitar.kmail.smtp.MailCommand
 import dev.sitar.kmail.smtp.SmtpCommand
 import dev.sitar.kmail.smtp.frames.replies.SmtpReply
+import dev.sitar.kmail.utils.todo
 
 class SubmissionAgent(
     transport: SmtpServerTransport,
@@ -44,18 +45,18 @@ class AuthenticationExtension(override val server: ServerConnection, private val
                 continuePropagation = false
 
                 server.transport.send(SmtpReply.PermanentNegative.Default(530, listOf("authentication is required.")))
-                TODO("command requires authentication")
+                todo("command requires authentication")
             }
 
             if (command !is AuthenticationCommand) return@filter
 
             require(server.transport.isSecure)
 
-            if (command.response == null) TODO("null response")
+            if (command.response == null) todo("null response")
 
             user = authenticationManager.authenticate(command.response!!)
 
-            if (user == null) TODO("not authenticated")
+            if (user == null) todo("not authenticated")
 
             isAuthenticated = true
 

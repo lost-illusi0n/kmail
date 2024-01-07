@@ -3,6 +3,7 @@ package dev.sitar.kmail.imap.frames.command
 import dev.sitar.kio.async.readers.AsyncReader
 import dev.sitar.kmail.imap.readList
 import dev.sitar.kmail.imap.readValue
+import dev.sitar.kmail.utils.todo
 
 sealed interface NotifyCommand: ImapCommand {
     override val identifier: ImapCommand.Identifier get() = ImapCommand.Identifier.Notify
@@ -26,7 +27,7 @@ sealed interface NotifyCommand: ImapCommand {
                             status = true
                             events = input.readList(checkFirst = false)
                         }
-                        else -> TODO()
+                        else -> todo()
                     }
 
                     return Events(status, events)
@@ -36,7 +37,7 @@ sealed interface NotifyCommand: ImapCommand {
 
                     return None
                 }
-                else -> TODO()
+                else -> todo()
             }
         }
     }

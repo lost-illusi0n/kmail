@@ -8,6 +8,7 @@ import dev.sitar.kio.use
 import dev.sitar.kmail.imap.PartSpecifier
 import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import dev.sitar.kmail.utils.io.writeStringUtf8
+import dev.sitar.kmail.utils.todo
 
 sealed interface DataItem {
     enum class Identifier(val raw: String, val fetchSerializer: Fetch.Serializer<out Fetch>, ) {
@@ -56,7 +57,7 @@ sealed interface DataItem {
 
                             if (identifier == "") break
 
-                            val typed = PartSpecifier.Identifier.from(identifier) ?: TODO("unknown identiifer: $identifier")
+                            val typed = PartSpecifier.Identifier.from(identifier) ?: todo("unknown identifier: $identifier")
 
                             add(typed.fetchSerializer.deserialize(input))
                         }

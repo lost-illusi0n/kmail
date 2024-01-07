@@ -5,6 +5,7 @@ import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.imap.frames.DataItem
 import dev.sitar.kmail.imap.frames.command.StoreMode
 import dev.sitar.kmail.message.Message
+import dev.sitar.kmail.utils.todo
 import kotlin.math.max
 import kotlin.math.min
 
@@ -150,14 +151,14 @@ interface ImapFolder {
             is Sequence.Set -> with(sequence.start) {
                 when (this) {
                     is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> TODO()
+                    Sequence.Position.Any -> todo()
                 }
             }
 
             is Sequence.Single -> with(sequence.pos) {
                 when (this) {
                     is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> TODO()
+                    Sequence.Position.Any -> todo()
                 }
             }
         }
@@ -173,7 +174,7 @@ interface ImapFolder {
             is Sequence.Single -> with(sequence.pos) {
                 when (this) {
                     is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> TODO()
+                    Sequence.Position.Any -> todo()
                 }
             }
         }

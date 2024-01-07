@@ -1,6 +1,7 @@
 package dev.sitar.kmail.smtp.frames.reply
 
 import dev.sitar.kio.async.writers.AsyncWriter
+import dev.sitar.kmail.utils.todo
 
 public sealed interface SmtpReplyCode {
     public val code: Int
@@ -53,7 +54,7 @@ public sealed interface SmtpReply {
 
     public data class Raw(override val code: SmtpReplyCode, val lines: List<String>): SmtpReply {
         public suspend fun serialize(output: AsyncWriter) {
-            TODO("Not yet implemented")
+            todo("Not yet implemented")
         }
 
         override suspend fun serialize(): Raw {
