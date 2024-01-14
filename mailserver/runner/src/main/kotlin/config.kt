@@ -15,6 +15,7 @@ import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
 import dev.sitar.kmail.agents.smtp.transports.SMTP_TRANSFER_PORT
 import dev.sitar.kmail.runner.storage.filesystems.LocalFileSystem
 import dev.sitar.kmail.smtp.Domain
+import mu.KotlinLogging
 import java.io.File
 
 private object DomainSerializer : StdDeserializer<Domain>(Domain::class.java) {
@@ -29,17 +30,19 @@ private object BucketLocationSerializer : StdDeserializer<BucketLocationConstrai
     }
 }
 
+private val logger = KotlinLogging.logger { }
+
 //@Serializable
 data class KmailConfig(
     val domains: List<Domain>,
     @JsonProperty("accounts")
     val accountStorage: Accounts = Accounts("", Accounts.Hash.Argon2),
     val proxy: Proxy? = null,
-    val mailbox: Mailbox,
-    val security: Security,
-    val smtp: Smtp,
-    val imap: Imap,
-    val pop3: Pop3,
+    val mailbox: Mailbox = Mailbox(format = Mailbox.Format.Maildir, Mailbox.Filesystem.Local(dir = "maildir")),
+    val security: Security? = null,
+    val smtp: Smtp = Smtp(Smtp.Submission(enabled = true), Smtp.Transfer(enabled = true)),
+    val imap: Imap = Imap(enabled = true),
+    val pop3: Pop3 = Pop3(enabled = false),
 ) {
     @JsonIgnore
     val accounts = retrieveAccounts()
@@ -48,9 +51,17 @@ data class KmailConfig(
         val contents = LocalFileSystem(accountStorage.dir).readFile("accounts.kmail")?.decodeToString()
         require(contents != null) { "accounts file is missing. it is not auto-generated yet."}
 
-        return contents.lines().map { entry ->
-            val (email, hash) = entry.split(' ')
-            Account(email, hash)
+        return contents.lines().filter(String::isNotEmpty).mapNotNull { entry ->
+            val parts = entry.split(' ')
+
+            if (parts.size != 2) {
+                logger.warn { "encountered improperly formatted line during account parsing, ignoring entry: $entry" }
+                null
+            } else {
+                val (email, hash) = parts
+
+                Account(email, hash)
+            }
         }
     }
 
