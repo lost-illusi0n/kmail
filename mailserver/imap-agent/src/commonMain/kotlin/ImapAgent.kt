@@ -21,6 +21,7 @@ private val logger = KotlinLogging.logger { }
 class ImapAgent(
     var transport: ImapServerTransport,
     val layer: ImapLayer,
+    val config: ImapConfig
 ) {
     var state: State = State.NotAuthenticated(this)
 
@@ -71,7 +72,7 @@ class ImapAgent(
             add(Capability.LoginDisabled)
 
             if (state is State.NotAuthenticated) {
-                if (transport.isSecure) {
+                if (transport.isSecure || config.allowInsecurePassword) {
                     add(Capability.Auth(SaslMechanism.Plain))
                 }
             }

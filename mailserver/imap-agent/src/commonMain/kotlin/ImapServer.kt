@@ -10,9 +10,14 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 private val logger = KotlinLogging.logger { }
 
+data class ImapConfig(
+    val allowInsecurePassword: Boolean
+)
+
 class ImapServer(
     val socket: ServerSocket,
-    val layer: ImapLayer
+    val layer: ImapLayer,
+    val config: ImapConfig
 ) {
     suspend fun listen() = supervisorScope {
         logger.debug { "IMAP server is listening." }
@@ -24,7 +29,7 @@ class ImapServer(
                 logger.debug { "Accepted a connection from ${transport.remote}" }
 
                 try {
-                    ImapAgent(transport, layer).handle()
+                    ImapAgent(transport, layer, config).handle()
                 } catch (e: Exception) {
                     logger.error(e) { "IMAP session encountered an exception." }
                 }

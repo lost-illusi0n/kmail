@@ -13,6 +13,7 @@ import com.fasterxml.jackson.dataformat.toml.TomlMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
 import dev.sitar.kmail.agents.smtp.transports.SMTP_TRANSFER_PORT
+import dev.sitar.kmail.imap.agent.ImapConfig
 import dev.sitar.kmail.runner.storage.filesystems.LocalFileSystem
 import dev.sitar.kmail.smtp.Domain
 import mu.KotlinLogging
@@ -131,8 +132,11 @@ data class KmailConfig(
     }
 
     data class Imap(
-        val enabled: Boolean
-    )
+        val enabled: Boolean,
+        val allowInsecurePassword: Boolean = false
+    ) {
+        fun toImapConfig() = ImapConfig(allowInsecurePassword)
+    }
 
     data class Pop3(
         val enabled: Boolean
