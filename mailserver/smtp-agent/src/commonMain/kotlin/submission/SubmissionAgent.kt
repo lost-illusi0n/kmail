@@ -19,17 +19,18 @@ class SubmissionAgent(
 ): ServerConnection(transport, config.domain) {
     override val extensions: Set<ServerExtension> = setOf(
         StartTlsExtension(this),
-        AuthenticationExtension(this, config.authenticationManager)
+        AuthenticationExtension(this, config.authenticationManager, config.allowInsecurePassword)
     )
 }
 
 data class SubmissionConfig(
     val domain: Domain,
     val requiresEncryption: Boolean,
-    val authenticationManager: SubmissionAuthenticationManager<*>?
+    val authenticationManager: SubmissionAuthenticationManager<*>?,
+    val allowInsecurePassword: Boolean
 )
 
-class AuthenticationExtension(override val server: ServerConnection, private val authenticationManager: SubmissionAuthenticationManager<*>?): ServerExtension {
+class AuthenticationExtension(override val server: ServerConnection, private val authenticationManager: SubmissionAuthenticationManager<*>?, private val allowInsecurePassword: Boolean): ServerExtension {
     var isAuthenticated: Boolean = false
         private set
 
@@ -50,7 +51,7 @@ class AuthenticationExtension(override val server: ServerConnection, private val
 
             if (command !is AuthenticationCommand) return@filter
 
-            require(server.transport.isSecure)
+            require(server.transport.isSecure || allowInsecurePassword)
 
             if (command.response == null) todo("null response")
 
@@ -67,7 +68,7 @@ class AuthenticationExtension(override val server: ServerConnection, private val
     override fun capabilities(): Set<String> {
         return when {
             isAuthenticated -> emptySet()
-            server.transport.isSecure && authenticationManager != null -> setOf("AUTH PLAIN")
+            (server.transport.isSecure || allowInsecurePassword) && authenticationManager != null -> setOf("AUTH PLAIN")
             else -> emptySet()
         }
     }

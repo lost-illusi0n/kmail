@@ -24,7 +24,7 @@ suspend fun submission(factory: ServerSocketFactory, outgoing: OutgoingMessageQu
 
     SubmissionServer(
         factory.bind(Config.smtp.submission.port),
-        SubmissionConfig(Config.domains.first(), requiresEncryption = true, KmailAuthenticationManager),
+        SubmissionConfig(Config.domains.first(), true, KmailAuthenticationManager, Config.smtp.submission.allowInsecurePassword),
         outgoing
     ).listen()
 }
