@@ -18,7 +18,7 @@ private val logger = KotlinLogging.logger { }
 suspend fun imap(socket: ServerSocketFactory, layer: ImapLayer) {
     logger.info("Starting IMAP server.")
 
-    ImapServer(socket.bind(IMAP_SERVER), layer).listen()
+    ImapServer(socket.bind(IMAP_SERVER), layer, Config.imap.toImapConfig()).listen()
 }
 
 // TODO: this is horrible
