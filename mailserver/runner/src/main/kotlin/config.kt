@@ -127,8 +127,16 @@ data class KmailConfig(
         val submission: Submission,
         val transfer: Transfer
     ) {
-        data class Submission(val enabled: Boolean, val port: Int = SMTP_SUBMISSION_PORT)
-        data class Transfer(val enabled: Boolean, val encryption: Boolean = true, val port: Int = SMTP_TRANSFER_PORT)
+        data class Submission(
+            val enabled: Boolean,
+            val port: Int = SMTP_SUBMISSION_PORT,
+            val allowInsecurePassword: Boolean = false
+        )
+        data class Transfer(
+            val enabled: Boolean,
+            val encryption: Boolean = true,
+            val port: Int = SMTP_TRANSFER_PORT
+        )
     }
 
     data class Imap(
