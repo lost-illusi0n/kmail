@@ -1,0 +1,12 @@
+domains = ["storm.sitar.dev"]
+
+[security]
+keystore = "certs/local.p12"
+password = "changeit"
+
+[mailbox]
+format = "maildir"
+
+[mailbox.filesystem]
+type = "local"
+dir = "mail"

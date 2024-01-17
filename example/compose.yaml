@@ -1,0 +1,14 @@
+services:
+  kmail:
+    image: ghcr.io/lost-illusi0n/kmail:master
+    container_name: kmail
+    volumes:
+      - ./accounts.kmail:/mailserver/accounts.kmail
+      - ./kmail.toml:/mailserver/kmail.toml
+      - ./certs:/mailserver/certs
+      - ./maildir:/mailserver/maildir
+    ports:
+      - 25:25
+      - 587:587
+      - 110:110
+      - 143:143
