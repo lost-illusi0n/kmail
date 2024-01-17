@@ -10,6 +10,7 @@ import dev.sitar.kmail.runner.storage.formats.MailboxFolder
 import dev.sitar.kmail.runner.storage.formats.MailboxMessage
 import dev.sitar.kmail.sasl.SaslChallenge
 import dev.sitar.kmail.utils.server.ServerSocketFactory
+import kotlinx.coroutines.flow.toList
 import kotlinx.datetime.Clock
 import mu.KotlinLogging
 
@@ -19,20 +20,6 @@ suspend fun imap(socket: ServerSocketFactory, layer: ImapLayer) {
     logger.info("Starting IMAP server.")
 
     ImapServer(socket.bind(IMAP_SERVER), layer).listen()
-}
-
-// TODO: this is horrible
-class KmailImapMessage(
-    override val flags: Set<Flag>,
-    override val sequenceNumber: Int,
-    override val size: Long,
-    private val message: suspend () -> Message,
-) : ImapMessage {
-    override val uniqueIdentifier: Int = sequenceNumber
-
-    override suspend fun typedMessage(): Message {
-        return message()
-    }
 }
 
 class KmailImapFolder(val folder: MailboxFolder) : ImapFolder {
@@ -67,9 +54,10 @@ class KmailImapFolder(val folder: MailboxFolder) : ImapFolder {
     }
 
     override suspend fun messages(): List<ImapMessage> {
-        return folder.messages().mapIndexed { index, message -> KmailImapMessage(
-            message.flags,
+        return folder.messages().mapIndexed { index, message -> ImapMessage(
             index + 1,
+            index + 1,
+            message.flags,
             message.length,
             message::getMessage
         ) }
@@ -108,7 +96,7 @@ class KmailImapFolder(val folder: MailboxFolder) : ImapFolder {
     }
 
     override suspend fun onMessageStore(handler: (suspend (ImapMessage) -> Unit)?) {
-        folder.onMessageStore = { handler?.invoke(KmailImapMessage(setOf(Flag.Recent), exists(), it.size.toLong(), { it })) }
+        folder.onMessageStore = { handler?.invoke(ImapMessage(exists(), exists(), setOf(Flag.Recent), it.size.toLong()) { it }) }
     }
 }
 

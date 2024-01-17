@@ -32,10 +32,10 @@ suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLaye
 
     filesystem.init()
 
-    logger.info { "initiated filesystem" }
-
     val storage = KmailStorageLayer(CachedFileSystem(filesystem))
     storage.init()
+
+    logger.info { "initiated filesystem and storage" }
 
     launch {
         incoming.filterSpam().mapToAccount().onEach { (account, message) ->

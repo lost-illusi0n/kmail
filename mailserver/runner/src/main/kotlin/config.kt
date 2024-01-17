@@ -139,8 +139,12 @@ data class KmailConfig(
     )
 }
 
+private val root = File(System.getenv("kmail-root") ?: "")
+
+fun resolve(path: String) = root.resolve(path)
+
 val Config: KmailConfig = TomlMapper().registerKotlinModule().registerModule(
     SimpleModule()
         .addDeserializer(Domain::class.java, DomainSerializer)
         .addDeserializer(BucketLocationConstraint::class.java, BucketLocationSerializer)
-).readValue(File("kmail.toml"), KmailConfig::class.java)
+).readValue(resolve("kmail.toml"), KmailConfig::class.java)

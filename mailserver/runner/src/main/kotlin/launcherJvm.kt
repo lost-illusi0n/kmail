@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import java.util.*
+import javax.net.ssl.SSLContext
 import kotlin.random.Random
 import kotlin.random.nextUBytes
 import kotlin.system.measureTimeMillis
@@ -35,10 +36,12 @@ suspend fun main() {
 
 //    System.setProperty("javax.net.debug", "all")
 
-    val (ssl, keystore) = ssl()
+    val ssl = if (Config.security != null) ssl(Config.security).first else SSLContext.getDefault()
+
     val socketFactory = TlsCapableServerSocketFactory(ssl)
-    // TODO: i cant get ktor connection factory to work
     val connectionFactory = TlsCapableConnectionFactory(ssl)
+
+    // TODO: i cant get ktor connection factory to work
 //    val connectionFactory = KtorConnectionFactory(TLSConfigBuilder().apply { addKeyStore(keystore, Config.security.password.toCharArray()) }.build())
 
     run(socketFactory, connectionFactory)

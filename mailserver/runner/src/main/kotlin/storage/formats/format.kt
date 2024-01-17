@@ -3,6 +3,7 @@ package dev.sitar.kmail.runner.storage.formats
 import dev.sitar.kmail.imap.agent.Flag
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.runner.storage.Attributable
+import kotlinx.coroutines.flow.Flow
 
 interface Mailbox: Attributable {
     val inbox: MailboxFolder

@@ -306,7 +306,7 @@ sealed interface State {
             }
 
             messages.forEach {
-                copy.save(it.flags, it.typedMessage().asText())
+                copy.save(it.flags, it.retrieve().asText())
             }
 
             agent.transport.send(tag + OkResponse(text = "copy done."))

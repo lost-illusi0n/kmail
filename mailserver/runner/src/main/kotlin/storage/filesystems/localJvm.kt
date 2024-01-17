@@ -1,5 +1,6 @@
 package dev.sitar.kmail.runner.storage.filesystems
 
+import dev.sitar.kmail.runner.resolve
 import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.Attributes
 import mu.KotlinLogging
@@ -8,7 +9,7 @@ import java.io.File
 private val logger = KotlinLogging.logger { }
 
 class LocalFileSystem(dir: String): FileSystem {
-    val root = File(dir)
+    val root = resolve(dir)
 
     override suspend fun init() {
         root.mkdir()

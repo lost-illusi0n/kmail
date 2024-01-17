@@ -1,11 +1,14 @@
 package dev.sitar.kmail.runner.storage.formats
 
 import dev.sitar.kmail.imap.agent.Flag
+import dev.sitar.kmail.imap.agent.ImapMessage
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.runner.Config
 import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.filesystems.FileSystem
 import dev.sitar.kmail.runner.storage.filesystems.FsFolder
+import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.flow.*
 import kotlinx.datetime.Clock
 import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicInteger

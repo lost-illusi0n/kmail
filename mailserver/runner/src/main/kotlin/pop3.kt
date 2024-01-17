@@ -11,6 +11,7 @@ import dev.sitar.kmail.utils.server.ServerSocketFactory
 import dev.sitar.kmail.utils.todo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import mu.KotlinLogging
 

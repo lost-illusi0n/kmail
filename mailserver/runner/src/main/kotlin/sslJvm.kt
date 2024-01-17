@@ -16,15 +16,15 @@ import javax.net.ssl.*
 
 private val logger = KotlinLogging.logger { }
 
-fun ssl(): Pair<SSLContext, KeyStore> {
+fun ssl(security: KmailConfig.Security): Pair<SSLContext, KeyStore> {
     val keyStore = KeyStore.getInstance("PKCS12")
-    keyStore.load(FileInputStream(Config.security.keystore), Config.security.password.toCharArray())
+    keyStore.load(FileInputStream(security.keystore), security.password.toCharArray())
 
     logger.debug { "Generating SSL context." }
     val ssl = SSLContext.getInstance("TLSv1.3")
 
     val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-    keyManagerFactory.init(keyStore, Config.security.password.toCharArray())
+    keyManagerFactory.init(keyStore, security.password.toCharArray())
 
     keyStore.aliases().iterator().forEach {
         logger.debug { "got certificate\n${keyStore.getCertificate(it)}"}

@@ -47,15 +47,13 @@ sealed class Flag(val value: String) {
     }
 }
 
-interface ImapMessage {
-    val uniqueIdentifier: Int
-    val sequenceNumber: Int
-    val flags: Set<Flag>
-
-    val size: Long
-
-    suspend fun typedMessage(): Message
-}
+data class ImapMessage(
+    val uniqueIdentifier: Int,
+    val sequenceNumber: Int,
+    val flags: Set<Flag>,
+    val size: Long,
+    val retrieve: suspend () -> Message
+)
 
 // TODO: maybe allow to lock?
 interface ImapFolder {
@@ -106,7 +104,7 @@ interface ImapFolder {
                     DataItem.Fetch.Rfc822Size -> add(DataItem.Response.Rfc822Size(message.size))
                     DataItem.Fetch.Uid -> add(DataItem.Response.Uid(message.uniqueIdentifier.toString()))
                     is DataItem.Fetch.BodyType -> {
-                        val typed = message.typedMessage()
+                        val typed = message.retrieve()
 
                         if (item.parts.isEmpty()) {
                             add(DataItem.Response.Body(PartSpecifier.Response.Body(typed)))
