@@ -3,6 +3,7 @@ package dev.sitar.kmail.runner.storage.filesystems
 import aws.sdk.kotlin.runtime.auth.credentials.StaticCredentialsProvider
 import aws.sdk.kotlin.services.s3.*
 import aws.sdk.kotlin.services.s3.model.GetObjectRequest
+import aws.sdk.kotlin.services.s3.model.Object
 import aws.smithy.kotlin.runtime.auth.awscredentials.Credentials
 import aws.smithy.kotlin.runtime.content.ByteStream
 import aws.smithy.kotlin.runtime.content.toByteArray
@@ -125,7 +126,13 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
             bucket = config.bucket.name
             this.delimiter = "/"
             this.prefix = folderKey.toString()
-        }.contents.orEmpty().filter { it.key!!.endsWith("/") && it.key!!.split('/').size > 3 }.map { S3Folder(fileSystem, folderKey.append(it.key!!.split('/').last())) }
+        }.contents.orEmpty()
+            .filter { it.isFolder() }
+            .map { S3Folder(fileSystem, folderKey.append(it.key!!.split('/').last())) }
+    }
+
+    private fun Object.isFolder(): Boolean {
+        return key!!.endsWith("/") && key!!.split('/').size > 3
     }
 
     override suspend fun listFiles(): List<FsFile> {
@@ -133,7 +140,11 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
             bucket = config.bucket.name
             this.delimiter = "/"
             this.prefix = folderKey.toString()
-        }.contents.orEmpty().filterNot { it.key!!.split('/').last().startsWith("kmail_") }.map { FsFile(it.key!!.split('/').last(), it.size) }
+        }.contents.orEmpty().filterNot { it.isNotAcceptableFile() }.map { FsFile(it.key!!.split('/').last(), it.size) }
+    }
+
+    private fun Object.isNotAcceptableFile(): Boolean {
+        return key!!.split('/').last().startsWith("kmail_") && key == folderKey.toString()
     }
 
     override suspend fun readFile(name: String): ByteArray? {
