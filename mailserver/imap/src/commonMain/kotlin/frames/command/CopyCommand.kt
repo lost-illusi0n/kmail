@@ -4,7 +4,7 @@ import dev.sitar.kio.async.readers.AsyncReader
 import dev.sitar.kmail.imap.Sequence
 import dev.sitar.kmail.imap.readValue
 
-data class CopyCommand(val sequence: Sequence, val mailbox: String): ImapCommand {
+data class CopyCommand(val sequence: Sequence.Set, val mailbox: String): ImapCommand {
     override val identifier: ImapCommand.Identifier = ImapCommand.Identifier.Copy
 
     companion object: ImapCommandSerializer<CopyCommand> {

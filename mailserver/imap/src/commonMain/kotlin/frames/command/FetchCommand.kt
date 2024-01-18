@@ -7,7 +7,7 @@ import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import dev.sitar.kmail.utils.io.readUtf8UntilLineEnd
 import dev.sitar.kmail.utils.todo
 
-data class FetchCommand(val sequence: Sequence, val dataItems: List<DataItem.Fetch>) : ImapCommand {
+data class FetchCommand(val sequence: Sequence.Set, val dataItems: List<DataItem.Fetch>) : ImapCommand {
     override val identifier: ImapCommand.Identifier = ImapCommand.Identifier.Fetch
 
     companion object : ImapCommandSerializer<FetchCommand> {

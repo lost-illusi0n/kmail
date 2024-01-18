@@ -4,11 +4,11 @@ import dev.sitar.kio.async.readers.AsyncReader
 import dev.sitar.kmail.utils.io.readUtf8StringUntil
 
 sealed class Sequence {
-    abstract val mode: Mode
+    data class Set(val selections: List<Sequence>, val mode: Mode)
 
-    data class Single(val pos: Position, override val mode: Mode): Sequence()
+    data class Single(val pos: Position): Sequence()
 
-    data class Set(val start: Position, val end: Position, override val mode: Mode): Sequence()
+    data class Range(val start: Position, val end: Position): Sequence()
 
     enum class Mode {
         Sequence,
@@ -31,13 +31,19 @@ sealed class Sequence {
     }
 
     companion object {
-        suspend fun deserialize(mode: Mode, input: AsyncReader): Sequence {
-            val set = input.readUtf8StringUntil { it == ' ' }
+        suspend fun deserialize(mode: Mode, input: AsyncReader): Set {
+            val sequence = input.readUtf8StringUntil { it == ' ' }
 
-            return when (val sep = set.indexOf(':')) {
-                -1 -> Single(Position.fromString(set), mode)
-                else -> Set(Position.fromString(set.substring(0, sep)), Position.fromString(set.substring(sep + 1)), mode)
+            val sections = buildList {
+                sequence.split(',').forEach { section ->
+                    when (val sep = section.indexOf(':')) {
+                        -1 -> add(Single(Position.fromString(section)))
+                        else -> add(Range(Position.fromString(section.substring(0, sep)), Position.fromString(section.substring(sep + 1))))
+                    }
+                }
             }
+
+            return Set(sections, mode)
         }
     }
 }

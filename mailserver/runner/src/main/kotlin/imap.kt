@@ -75,7 +75,7 @@ class KmailImapFolder(val folder: MailboxFolder) : ImapFolder {
         }
     }
 
-    override suspend fun store(sequence: Sequence, flags: Set<Flag>, mode: StoreMode, messagesSnapshot: List<ImapMessage>?) : Map<Int, Set<Flag>> {
+    override suspend fun store(sequence: Sequence.Set, flags: Set<Flag>, mode: StoreMode, messagesSnapshot: List<ImapMessage>?) : Map<Int, Set<Flag>> {
         val messages = sequenceToMessages(sequence, messagesSnapshot ?: messages())
 
         return messages.associate {

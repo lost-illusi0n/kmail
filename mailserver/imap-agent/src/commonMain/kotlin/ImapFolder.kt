@@ -78,9 +78,9 @@ interface ImapFolder {
 
     suspend fun save(flags: Set<Flag>, message: String)
 
-    suspend fun store(sequence: Sequence, flags: Set<Flag>, mode: StoreMode, messagesSnapshot: List<ImapMessage>? = null): Map<Int, Set<Flag>>
+    suspend fun store(sequence: Sequence.Set, flags: Set<Flag>, mode: StoreMode, messagesSnapshot: List<ImapMessage>? = null): Map<Int, Set<Flag>>
 
-    suspend fun fetch(sequence: Sequence, dataItems: List<DataItem.Fetch>): Map<Int, Set<DataItem.Response>> {
+    suspend fun fetch(sequence: Sequence.Set, dataItems: List<DataItem.Fetch>): Map<Int, Set<DataItem.Response>> {
         val messagesSnapshot = messages()
 
         val selectedMessages = sequenceToMessages(sequence, messagesSnapshot).takeIf { it.isNotEmpty() } ?: return emptyMap()
@@ -140,59 +140,60 @@ interface ImapFolder {
     }
 
     suspend fun sequenceToMessages(
-        sequence: Sequence,
+        sequence: Sequence.Set,
         messagesSnapshot: List<ImapMessage>? = null
     ): List<ImapMessage> {
         val messagesSnapshot = messagesSnapshot ?: messages()
-
-        val start = when (sequence) {
-            is Sequence.Set -> with(sequence.start) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> todo()
-                }
-            }
-
-            is Sequence.Single -> with(sequence.pos) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> todo()
-                }
-            }
-        }
-
-        val end = when (sequence) {
-            is Sequence.Set -> with(sequence.end) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> messagesSnapshot.size
-                }
-            }
-
-            is Sequence.Single -> with(sequence.pos) {
-                when (this) {
-                    is Sequence.Position.Actual -> pos
-                    Sequence.Position.Any -> todo()
-                }
-            }
-        }
-
         val exists = exists()
 
-        if (!(start in 0..exists && end in 0..exists)) return listOf()
+        return sequence.selections.flatMap {
+            val start = when (it) {
+                is Sequence.Range -> with(it.start) {
+                    when (this) {
+                        is Sequence.Position.Actual -> pos
+                        Sequence.Position.Any -> todo()
+                    }
+                }
 
-        return when (sequence.mode) {
-            Sequence.Mode.Sequence -> {
-                messagesSnapshot.subList(messagesSnapshot.size - end, messagesSnapshot.size + 1 - start)
+                is Sequence.Single -> with(it.pos) {
+                    when (this) {
+                        is Sequence.Position.Actual -> pos
+                        Sequence.Position.Any -> todo()
+                    }
+                }
             }
 
-            Sequence.Mode.Uid -> {
-                val a = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == start }
-                val b = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == end }
+            val end = when (it) {
+                is Sequence.Range -> with(it.end) {
+                    when (this) {
+                        is Sequence.Position.Actual -> pos
+                        Sequence.Position.Any -> messagesSnapshot.size
+                    }
+                }
 
-                val start = min(a, b)
-                val end = max(a, b)
-                messagesSnapshot.subList(start, end + 1)
+                is Sequence.Single -> with(it.pos) {
+                    when (this) {
+                        is Sequence.Position.Actual -> pos
+                        Sequence.Position.Any -> todo()
+                    }
+                }
+            }
+
+            if (!(start in 0..exists && end in 0..exists)) return listOf()
+
+            when (sequence.mode) {
+                Sequence.Mode.Sequence -> {
+                    messagesSnapshot.subList(messagesSnapshot.size - end, messagesSnapshot.size + 1 - start)
+                }
+
+                Sequence.Mode.Uid -> {
+                    val a = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == start }
+                    val b = messagesSnapshot.indexOfFirst { it.uniqueIdentifier == end }
+
+                    val start = min(a, b)
+                    val end = max(a, b)
+                    messagesSnapshot.subList(start, end + 1)
+                }
             }
         }
     }

@@ -6,7 +6,7 @@ import dev.sitar.kmail.imap.readList
 import dev.sitar.kmail.utils.io.readUtf8StringUntil
 import java.lang.Exception
 
-data class StoreCommand(val sequence: Sequence, val item: StoreDataItem): ImapCommand {
+data class StoreCommand(val sequence: Sequence.Set, val item: StoreDataItem): ImapCommand {
     override val identifier: ImapCommand.Identifier = ImapCommand.Identifier.Append
 
     companion object: ImapCommandSerializer<StoreCommand> {
