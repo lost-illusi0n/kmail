@@ -28,4 +28,7 @@ Kmail is built and managed with Gradle. There is a root gradle project called `k
 Kmail exposes standalone libraries for [IMAP](mailserver/imap), [SMTP](mailserver/smtp), and [POP3](mailserver/pop3). They should be treated as standalone libraries and stay separate from Kmail internals. 
 
 ## Contributing
-Contributions are welcome, however, due to the very early stage of development, please open an issue first discussing anything you would like to add or change.
+Contributions are welcome, however due to the very early stage of development, please open an issue first discussing anything you would like to add or change.
+
+## License
+This project is published under the [MIT license](https://github.com/lost-illusi0n/kmail/blob/master/LICENSE).
