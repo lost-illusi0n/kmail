@@ -34,6 +34,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("aws.sdk.kotlin:s3:0.32.0-beta")
 
+    implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.4.0")
+
     implementation(project(":smtp-agent"))
     implementation(project(":smtp"))
     implementation(project(":imap-agent"))

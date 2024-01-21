@@ -12,6 +12,10 @@ import dev.sitar.kmail.runner.KmailConfig
 import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.Attributes
 import mu.KotlinLogging
+import net.thauvin.erik.urlencoder.UrlEncoderUtil
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.Charset
 
 private interface S3Context {
     val config: KmailConfig.Mailbox.Filesystem.S3
@@ -93,6 +97,17 @@ class S3Attributes(val folder: S3Folder) : Attributes, S3Context by folder {
     }
 }
 
+private const val ALLOWED_S3_CHARACTERS = "/"
+
+private fun String.escape(): String {
+    return UrlEncoderUtil.encode(this, ALLOWED_S3_CHARACTERS)
+}
+
+private fun String.unescape(): String {
+    return UrlEncoderUtil.decode(this)
+
+}
+
 class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, FsFolder, S3Context by fileSystem {
     override val name: String = folderKey.folders.last()
 
@@ -105,7 +120,7 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
     override suspend fun createFolder(name: String): S3Folder {
         client.putObject {
             bucket = config.bucket.name
-            this.key = "$folderKey$name/"
+            this.key = "$folderKey$name/".escape()
         }
 
         return S3Folder(fileSystem, folderKey.append(name))
@@ -114,7 +129,7 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
     override suspend fun getFile(name: String): FsFile {
         val obj = client.headObject {
             this.bucket = config.bucket.name
-            this.key = "$folderKey$name"
+            this.key = "$folderKey$name".escape()
         }
 
         return FsFile(name, obj.contentLength)
@@ -125,10 +140,10 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
         return client.listObjectsV2 {
             bucket = config.bucket.name
             this.delimiter = "/"
-            this.prefix = folderKey.toString()
+            this.prefix = folderKey.toString().escape()
         }.contents.orEmpty()
             .filter { it.isFolder() }
-            .map { S3Folder(fileSystem, folderKey.append(it.key!!.split('/').last())) }
+            .map { S3Folder(fileSystem, folderKey.append(it.key!!.split('/').last().unescape())) }
     }
 
     private fun Object.isFolder(): Boolean {
@@ -139,18 +154,18 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
         return client.listObjectsV2 {
             bucket = config.bucket.name
             this.delimiter = "/"
-            this.prefix = folderKey.toString()
+            this.prefix = folderKey.toString().escape()
         }.contents.orEmpty().filterNot { it.isNotAcceptableFile() }.map { FsFile(it.key!!.split('/').last(), it.size) }
     }
 
     private fun Object.isNotAcceptableFile(): Boolean {
-        return key!!.split('/').last().startsWith("kmail_") && key == folderKey.toString()
+        return key!!.split('/').last().startsWith("kmail_") || key == folderKey.toString()
     }
 
     override suspend fun readFile(name: String): ByteArray? {
         val request = GetObjectRequest {
             this.bucket = config.bucket.name
-            this.key = "$folderKey$name"
+            this.key = "$folderKey$name".escape()
         }
 
         return try {
@@ -163,7 +178,7 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
     override suspend fun writeFile(name: String, contents: ByteArray): FsFile {
         client.putObject {
             bucket = config.bucket.name
-            key = "$folderKey$name"
+            key = "$folderKey$name".escape()
             body = ByteStream.fromBytes(contents)
         }
 
@@ -175,26 +190,26 @@ class S3Folder(val fileSystem: S3FileSystem, val folderKey: Key): Attributable, 
 
         client.copyObject {
             bucket = config.bucket.name
-            key = "${folder.folderKey}$file"
-            copySource = "/${config.bucket.name}/$folderKey$file"
+            key = "${folder.folderKey}$file".escape()
+            copySource = "/${config.bucket.name}/$folderKey$file".escape()
         }
 
         client.deleteObject {
             bucket = config.bucket.name
-            this.key = "$folderKey$file"
+            this.key = "$folderKey$file".escape()
         }
     }
 
     override suspend fun rename(from: String, to: String) {
         client.copyObject {
             bucket = config.bucket.name
-            key = "$folderKey$to"
-            copySource = "/${config.bucket.name}/$folderKey$from"
+            key = "$folderKey$to".escape()
+            copySource = "/${config.bucket.name}/$folderKey$from".escape()
         }
 
         client.deleteObject {
             bucket = config.bucket.name
-            this.key = "$folderKey$from"
+            this.key = "$folderKey$from".escape()
         }
     }
 }
