@@ -19,7 +19,7 @@ kotlin {
         implementation("io.github.microutils:kotlin-logging:3.0.2")
 
         implementation("dev.sitar:kio:1.1.3")
-        implementation("dev.sitar:keystone:0.1-SNAPSHOT")
+        implementation("dev.sitar:keystone:0.2")
         implementation("io.ktor:ktor-network:2.1.3")
         implementation("io.ktor:ktor-network-tls:2.1.3")
         implementation("dev.sitar:dnskotlin:0.2.1")

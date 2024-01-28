@@ -37,12 +37,10 @@ suspend fun CoroutineScope.mailbox(incoming: Flow<InternetMessage>): StorageLaye
 
     logger.info { "initiated filesystem and storage" }
 
-    launch {
-        incoming.filterSpam().mapToAccount().onEach { (account, message) ->
-            logger.debug { "received email for ${account.email}" }
-            storage.user(account.email).store(message.message.asText())
-        }.launchIn(this)
-    }
+    incoming.filterSpam().mapToAccount().onEach { (account, message) ->
+        logger.debug { "received email for ${account.email}" }
+        storage.user(account.email).store(message.message.asText())
+    }.launchIn(this)
 
     return storage
 }

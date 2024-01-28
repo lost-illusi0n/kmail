@@ -1,7 +1,6 @@
 package dev.sitar.kmail.agents.smtp
 
 import dev.sitar.kmail.agents.smtp.transports.IMPLICIT_SMTP_PORT
-import dev.sitar.kmail.agents.smtp.transports.SMTP_SUBMISSION_PORT
 import dev.sitar.kmail.agents.smtp.transports.SMTP_TRANSFER_PORT
 import dev.sitar.kmail.agents.smtp.transports.client.SmtpClientTransport
 import dev.sitar.kmail.utils.connection.ConnectionFactory
@@ -20,9 +19,14 @@ interface SmtpServerConnector {
      */
     suspend fun connect(host: String): SmtpClientTransport? {
         for (port in ports) {
-            val connection = withTimeoutOrNull(timeout) {
-                logger.debug { "Attempting to connect to $host using $connectionFactory." }
-                connectionFactory.connect(host, port)
+            val connection = try {
+                withTimeoutOrNull(timeout) {
+                    logger.debug { "Attempting to connect to $host using $connectionFactory." }
+                    connectionFactory.connect(host, port)
+                }
+            } catch (e: Exception) {
+                logger.debug(e) { "Couldn't connect to $host using $connectionFactory." }
+                null
             }
 
             if (connection != null) {

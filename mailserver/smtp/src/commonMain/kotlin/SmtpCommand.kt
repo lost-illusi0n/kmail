@@ -78,9 +78,10 @@ public data class MailCommand(val from: Path /* params */) : SmtpCommand {
         }
 
         public override suspend fun deserialize(input: AsyncSmtpReader): MailCommand {
-            if (input.readStringUtf8(5) != "FROM:") todo("incorrect syntax")
+            val from = input.readStringUtf8(5)
+            if (from != "FROM:") todo("incorrect syntax, got: $from")
 
-            val path = Path.fromText(input.readUtf8UntilLineEnd()) ?: todo("incorrect syntax")
+            val path = Path.fromText(input.readUtf8UntilLineEnd())
 
             return MailCommand(path)
         }

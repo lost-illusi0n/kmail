@@ -12,6 +12,7 @@ import dev.sitar.kmail.smtp.MailCommand
 import dev.sitar.kmail.smtp.SmtpCommand
 import dev.sitar.kmail.smtp.frames.replies.SmtpReply
 import dev.sitar.kmail.utils.todo
+import kotlinx.coroutines.CoroutineScope
 
 class SubmissionAgent(
     transport: SmtpServerTransport,
@@ -36,20 +37,20 @@ class AuthenticationExtension(override val server: ServerConnection, private val
 
     var user: SmtpAuthenticatedUser? = null
 
-    override fun apply() {
+    override fun apply(scope: CoroutineScope) {
         if (authenticationManager == null) return
 
-        server.transport.commandPipeline.filter(SmtpCommandPipeline.Process) {
-            require(this is SmtpCommandContext.Known)
-
+        server.transport.commandPipeline.filter(SmtpCommandPipeline.Processing) {
             if (command.requiresAuthentication && user == null) {
-                continuePropagation = false
+                wasProcessed = true
 
                 server.transport.send(SmtpReply.PermanentNegative.Default(530, listOf("authentication is required.")))
                 todo("command requires authentication")
             }
 
             if (command !is AuthenticationCommand) return@filter
+
+            wasProcessed = true
 
             require(server.transport.isSecure || allowInsecurePassword)
 

@@ -34,16 +34,18 @@ abstract class ClientConnection(
             try {
                 runner.step()
             } catch (e: Exception) {
-                todo("failed objective")
+                logger.error(e) { "failed objective" }
+                runner.lastResult
+                break
             }
         }
 
         transport.send(QuitCommand)
         recv()
 
-        logger.info { "Connection ${transport.connection.value.remote} has terminated." }
+        logger.info { "Connection ${transport.connection.remote} has terminated." }
 
-        transport.close()
+        transport.connection.close()
 
         return runner.lastResult
     }
@@ -146,7 +148,7 @@ class MailObjective(override val client: ClientConnection, val message: Internet
 
         rcpts.forEach {
             client.transport.send(RecipientCommand(it))
-            client.recv()
+            if (client.recv().code is SmtpReplyCode.TransientNegative) return ClientObjective.Result.RetryLater
         }
 
         client.transport.send(DataCommand)

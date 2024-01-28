@@ -1,5 +1,6 @@
 package dev.sitar.kmail.agents.smtp.transfer
 
+import dev.sitar.kmail.agents.smtp.connections.ServerSink
 import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.smtp.InternetMessage
 import dev.sitar.kmail.utils.server.ServerSocket
@@ -20,16 +21,18 @@ class TransferReceiveServer(
         logger.info("SMTP receive server is listening.")
 
         while (isActive) {
-            withContext(Dispatchers.IO) {
-                val transport = SmtpServerTransport(socket.accept())
+            val transport = SmtpServerTransport(socket.accept())
 
+            launch(Dispatchers.IO) {
                 logger.debug { "Accepted a connection from ${transport.remote}." }
 
-                launch {
-                    val agent = TransferReceiveAgent(transport, config)
-                    agent.handle()
-                    agent.incoming.collect { incoming.emit(it) }
+                try {
+                    TransferReceiveAgent(transport, config).handleAndPipeTo { incoming.emit(it) }
+                } catch (e: Exception) {
+                    logger.error(e) { "SMTP session (${transport.connection.remote} encountered an exception." }
                 }
+
+                logger.debug { "SMTP session (${transport.connection.remote} completed." }
             }
         }
     }

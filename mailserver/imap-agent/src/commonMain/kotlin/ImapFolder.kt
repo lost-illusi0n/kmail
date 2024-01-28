@@ -64,6 +64,17 @@ interface ImapFolder {
 
     suspend fun onMessageStore(handler: (suspend (ImapMessage) -> Unit)?)
 
+    /**
+     * Mark all new messages as seen. Usually done when a folder is selected.
+     */
+    suspend fun read() {
+        val messages = messages()
+
+        val sequence = Sequence.Set(messages.filter { it.flags.contains(Flag.Recent) }.map { Sequence.Single(Sequence.Position.Actual(it.uniqueIdentifier)) }, Sequence.Mode.Uid)
+
+        store(sequence, setOf(Flag.Recent), StoreMode.Remove, messages)
+    }
+
     suspend fun exists(): Int
     suspend fun recent(): Int
 
@@ -85,6 +96,7 @@ interface ImapFolder {
 
         val selectedMessages = sequenceToMessages(sequence, messagesSnapshot).takeIf { it.isNotEmpty() } ?: return emptyMap()
 
+        store(sequence, setOf(Flag.Recent), StoreMode.Remove, messagesSnapshot)
         if (dataItems.any { it is DataItem.Fetch.Body }) store(sequence, setOf(Flag.Seen), StoreMode.Add, messagesSnapshot = messagesSnapshot)
 
         return selectedMessages.associate { message ->

@@ -2,8 +2,9 @@ package dev.sitar.kmail.smtp
 
 import dev.sitar.dns.utils.NetworkAddress
 import dev.sitar.kio.fullSlice
+import dev.sitar.kmail.utils.todo
 
-public fun String.asPath(): Path = Path.fromText(this)!!
+public fun String.asPath(): Path = Path.fromText(this)
 
 public data class Path(val atDomain: String?, val mailbox: Mailbox) {
     public fun asText(): String {
@@ -11,8 +12,8 @@ public data class Path(val atDomain: String?, val mailbox: Mailbox) {
     }
 
     public companion object {
-        public fun fromText(text: String): Path? {
-            if (!text.startsWith('<') || !text.endsWith('>')) return null
+        public fun fromText(text: String): Path {
+            if (!text.startsWith('<') || !text.endsWith('>')) todo("path not wrapped around with <>: $text")
 
             val path = text.substring(1, text.length - 1)
 
@@ -27,7 +28,7 @@ public data class Path(val atDomain: String?, val mailbox: Mailbox) {
                 }
             }
 
-            val mailbox = Mailbox.fromText(mailboxText) ?: return null
+            val mailbox = Mailbox.fromText(mailboxText)
 
             return Path(atDomain, mailbox)
         }
@@ -52,7 +53,7 @@ public sealed interface Domain {
     public fun asString(): String
 
     public companion object {
-        public fun fromText(text: String): Domain? {
+        public fun fromText(text: String): Domain {
             if (text.startsWith('[') && text.endsWith(']')) {
                 val addressLiteral = text.substring(1, text.length - 1)
 
@@ -61,7 +62,7 @@ public sealed interface Domain {
                     .split('.')
                     .takeIf { it.size == 4 }
                     ?.map { it.toUByte() }
-                    ?.toUByteArray() ?: return null
+                    ?.toUByteArray() ?: todo("invalid literal address: $text")
 
                 return AddressLiteral(NetworkAddress.Ipv4Address(data.asByteArray().fullSlice()))
             }
@@ -80,13 +81,13 @@ public data class Mailbox(
     }
 
     public companion object {
-        public fun fromText(text: String): Mailbox? {
+        public fun fromText(text: String): Mailbox {
             val parts = text.split('@')
-            if (parts.size != 2) return null
+            if (parts.size != 2) todo("multiple @s in mailbox: $text")
             val localPart = parts[0]
             val domainText = parts[1]
 
-            val domain = Domain.fromText(domainText) ?: return null
+            val domain = Domain.fromText(domainText)
             return Mailbox(localPart, domain)
         }
     }

@@ -31,10 +31,10 @@ class ImapServer(
                 try {
                     ImapAgent(transport, layer, config).handle()
                 } catch (e: Exception) {
-                    logger.error(e) { "IMAP session encountered an exception." }
+                    logger.error(e) { "IMAP session (${transport.connection.remote} encountered an exception." }
                 }
 
-                logger.debug { "IMAP session completed." }
+                logger.debug { "IMAP session (${transport.connection.remote} completed." }
             }
         }
     }

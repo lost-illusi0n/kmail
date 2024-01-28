@@ -20,62 +20,52 @@ import kotlin.coroutines.EmptyCoroutineContext
 private val logger = KotlinLogging.logger { }
 
 // direct connection server -> client
-class SmtpServerTransport(connection: Connection, coroutineContext: CoroutineContext = EmptyCoroutineContext) {
-    val connection = MutableStateFlow(connection)
+class SmtpServerTransport(var connection: Connection) {
+    val remote: String get() = connection.remote
 
-    val remote: String get() = connection.value.remote
-
-    val isSecure: Boolean get() = connection.value.isSecure
-
-    val commandPipeline = SmtpCommandPipeline()
+    val isSecure: Boolean get() = connection.isSecure
 
     private var reader: AsyncSmtpServerReader = connection.reader.asAsyncSmtpServerReader()
     private var writer: AsyncSmtpServerWriter = connection.writer.asAsyncSmtpServerWriter()
-    val scope = CoroutineScope(Job() + coroutineContext)
 
-    private val lock = Mutex(true)
+    val commandPipeline = SmtpCommandPipeline()
 
-    init {
-        this.connection.onEach {
-            reader = it.reader.asAsyncSmtpServerReader()
-            writer = it.writer.asAsyncSmtpServerWriter()
-            lock.unlock()
-        }.launchIn(scope)
-
-        scope.launch {
-            while (isActive) {
-                val context = try {
-                    val command = lock.withLock { reader.readSmtpCommand() }
-                    SmtpCommandContext.Known(command, true)
-                } catch (e: Exception) {
-                    SmtpCommandContext.Unknown(e, true)
-                }
+    suspend fun startPipeline() = coroutineScope {
+        while (isActive && reader.openForRead) {
+            try {
+                val command = reader.readSmtpCommand()
+                val context = SmtpCommandContext(command, false)
 
                 commandPipeline.process(context)
+            } catch (e: Exception) {
+                logger.error(e) { "SMTP transport stream encountered an exception." }
+
+                cancel()
+                break
             }
         }
     }
 
     suspend fun send(reply: SmtpReply<*>) {
-        logger.trace { "TO ${connection.value.remote}: $reply" }
+        logger.trace { "SMTP ($remote) >>> $reply" }
         writer.writeReply(reply)
     }
 
     suspend fun recvMail(): Message {
         val mail = reader.readMailInput()
-        logger.trace { "FROM ${connection.value.remote}: $mail" }
+        logger.trace { "SMTP ($remote) <<< $mail" }
         return mail
     }
 
     suspend fun secure() {
         if (isSecure) return
 
-        lock.lock()
-        connection.emit(connection.value.secureAsServer())
+        connection = connection.secureAsServer()
+        updateReaderWriter()
     }
 
-    fun close() {
-        connection.value.close()
-        scope.cancel()
+    private fun updateReaderWriter() {
+        reader = connection.reader.asAsyncSmtpServerReader()
+        writer = connection.writer.asAsyncSmtpServerWriter()
     }
 }

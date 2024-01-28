@@ -1,26 +1,23 @@
 package dev.sitar.kmail.runner.storage.formats
 
 import dev.sitar.kmail.imap.agent.Flag
-import dev.sitar.kmail.imap.agent.ImapMessage
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.runner.Config
 import dev.sitar.kmail.runner.storage.Attributable
 import dev.sitar.kmail.runner.storage.filesystems.FileSystem
 import dev.sitar.kmail.runner.storage.filesystems.FsFolder
-import kotlinx.coroutines.channels.ProducerScope
-import kotlinx.coroutines.flow.*
 import kotlinx.datetime.Clock
 import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 
 // TODO: this should change depending on platform. e.g., standard is : but windows doesnt support that, so it uses ; or - instead.
-const val MAILDIR_SEPERATOR = ";"
+const val MAILDIR_SEPARATOR = ";"
 
 // TODO: this sucks
 @JvmInline
 value class MaildirUniqueName(val value: String) {
-    constructor(name: String, flags: Set<Flag>? = null) : this(name + flags.orEmpty().joinToString(prefix = "${MAILDIR_SEPERATOR}2,", separator = "") {
+    constructor(name: String, flags: Set<Flag>? = null) : this(name + flags.orEmpty().joinToString(prefix = "${MAILDIR_SEPARATOR}2,", separator = "") {
         if (it !is Flag.Other) it::class.simpleName!!.first().toString()
         else {
             logger.error { "encountered a non-standard flag. not yet supported" }
@@ -42,7 +39,7 @@ value class MaildirUniqueName(val value: String) {
         flags: Set<Flag>? = null
     ) : this("$timestamp.S${sequenceNumber}X${bootNumber}R${random}.$hostname", flags)
 
-    val flags get() = value.split(MAILDIR_SEPERATOR).last().run {
+    val flags get() = value.split(MAILDIR_SEPARATOR).last().run {
         if (startsWith("2,")) removePrefix("2,").map { it.toFlag() } else emptyList()
     }
 }
@@ -186,18 +183,18 @@ private val deliveries: AtomicInteger = AtomicInteger(0)
 private val logger = KotlinLogging.logger { }
 
 class MaildirMessage(var fileName: String, override val length: Long, var folder: FsFolder, val mailbox: Maildir): MailboxMessage {
-    override val name: String = fileName.split(':').first()
+    override val name: String = fileName.split(MAILDIR_SEPARATOR).first()
 
     override val flags: Set<Flag> get() = MaildirUniqueName(fileName).flags.toSet()
 
     override suspend fun updateFlags(flags: Set<Flag>) {
-        if (Flag.Seen in flags) {
-            if (folder.name == "new") {
-                mailbox.inbox.new.moveFile(MaildirUniqueName(fileName), mailbox.inbox.cur)
-                folder = mailbox.inbox.cur.folder
-            }
+        if (Flag.Recent !in flags && folder.name == "new") {
+            logger.debug { "moving ${mailbox.user.name}/$fileName from new to cur due to missing recent flag." }
+            mailbox.inbox.new.moveFile(MaildirUniqueName(fileName), mailbox.inbox.cur)
+            folder = mailbox.inbox.cur.folder
         }
 
+        logger.debug { "updating flags for ${mailbox.user.name}/${folder.name}/${fileName} to $flags." }
         val newName = MaildirUniqueName(name, flags).value
         folder.rename(fileName, newName)
         fileName = newName

@@ -28,11 +28,9 @@ class ImapAgent(
     suspend fun handle() = coroutineScope {
         launch { transport.startPipeline() }
 
-        transport.send(Tag.Untagged + OkResponse(text = "kmail imap service"))
-
         transport.commandPipeline {
             filter(ImapCommandPipeline.Logging) {
-                logger.trace { "<<< $command" }
+                logger.trace { "IMAP (${transport.connection.remote}) <<< $command" }
             }
 
             filter(ImapCommandPipeline.Before) {
@@ -56,13 +54,18 @@ class ImapAgent(
                 }
 
                 if (command.command is LogoutCommand) {
-                    transport.send(Tag.Untagged + ByeResponse(text = "bye."))
+                    try {
+                        transport.send(Tag.Untagged + ByeResponse(text = "bye."))
+                    } catch (_: Exception) { }
+
                     cancel()
                     transport.connection.close()
                     awaitCancellation()
                 }
             }
         }
+
+        transport.send(Tag.Untagged + OkResponse(text = "kmail imap service"))
     }
 
     private val capabilities: List<Capability>
@@ -120,7 +123,7 @@ sealed interface State {
                         val mailbox = agent.layer.mailbox(user)
 
                         agent.transport.send(tag + OkResponse(text = "authenticated."))
-                        agent.state = Authenticated(agent, mailbox)
+                        agent.state = Authenticated(agent, mailbox, user)
                     } else {
                         logger.debug { "user ${challenge.authenticationIdentity} failed to authenticate."}
                         todo("not authenticated")
@@ -130,7 +133,7 @@ sealed interface State {
             }
         }
     }
-    class Authenticated(val agent: ImapAgent, val mailbox: ImapMailbox): State {
+    class Authenticated(val agent: ImapAgent, val mailbox: ImapMailbox, val user: String): State {
         override suspend fun handle(context: ImapCommandContext) {
             context.wasProcessed = true
             val command = context.command.command
@@ -140,19 +143,20 @@ sealed interface State {
                 is SelectCommand -> {
                     val folder = mailbox.folder(command.mailboxName)
 
-                    if (folder != null) {
-                        agent.transport.send(Tag.Untagged + FlagsResponse(flags = folder.flags))
-                        agent.transport.send(Tag.Untagged + ExistsResponse(n = folder.exists()))
-                        agent.transport.send(Tag.Untagged + RecentResponse(n = folder.recent()))
-//                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UNSEEN ${folder.unseen}]"))
-                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${folder.uidValidity()}]")) // TODO: this is a response code
-                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${folder.uidNext()}]")) // TODO: this is a response code
-                        agent.transport.send(context.command.tag + OkResponse(text = "[READ-WRITE] SELECT complete."))
+                    if (folder == null) todo("bad folder")
 
-                        agent.state = Selected(agent, this, folder)
-                    } else {
-                        todo("bad folder")
-                    }
+                    agent.transport.send(Tag.Untagged + FlagsResponse(flags = folder.flags))
+                    agent.transport.send(Tag.Untagged + ExistsResponse(n = folder.exists()))
+                    agent.transport.send(Tag.Untagged + RecentResponse(n = folder.recent()))
+//                        agent.transport.send(Tag.Untagged + OkResponse(text = "[UNSEEN ${folder.unseen}]"))
+                    agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDVALIDITY ${folder.uidValidity()}]")) // TODO: this is a response code
+                    agent.transport.send(Tag.Untagged + OkResponse(text = "[UIDNEXT ${folder.uidNext()}]")) // TODO: this is a response code
+                    agent.transport.send(context.command.tag + OkResponse(text = "[READ-WRITE] SELECT complete."))
+
+                    logger.debug { "un-marking all recent messages in $user/${folder.name}" }
+                    folder.read()
+
+                    agent.state = Selected(agent, this, folder)
                 }
 //                EXAMINE,
 //                NAMESPACE,

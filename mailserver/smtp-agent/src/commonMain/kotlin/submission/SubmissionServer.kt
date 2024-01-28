@@ -16,19 +16,21 @@ class SubmissionServer(
     val outgoing: OutgoingMessageQueue
 ) {
     suspend fun listen() = supervisorScope {
-        logger.debug { "Submission SMTP server is listening." }
+        logger.debug { "SMTP submission server is listening." }
 
         while (isActive) {
-            withContext(Dispatchers.IO) {
-                val transport = SmtpServerTransport(socket.accept())
+            val transport = SmtpServerTransport(socket.accept())
 
+            launch(Dispatchers.IO) {
                 logger.debug { "Accepted a connection from ${transport.remote}." }
 
-                launch {
-                    val agent = SubmissionAgent(transport, config)
-                    agent.handle()
-                    agent.incoming.collect { outgoing.send(it) }
+                try {
+                    SubmissionAgent(transport, config).handleAndPipeTo { outgoing.send(it) }
+                } catch (e: Exception) {
+                    logger.error(e) { "SMTP session (${transport.connection.remote} encountered an exception." }
                 }
+
+                logger.debug { "SMTP session (${transport.connection.remote} completed." }
             }
         }
     }

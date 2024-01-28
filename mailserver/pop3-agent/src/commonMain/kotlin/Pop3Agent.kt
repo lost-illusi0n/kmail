@@ -58,7 +58,10 @@ class Pop3Agent(
                 if (wasProcessed) return@filter
 
                 if (command is QuitCommand) {
-                    transport.sendReply(Pop3Reply.OkReply("bye"))
+                    try {
+                        transport.sendReply(Pop3Reply.OkReply("bye"))
+                    } catch (_: Exception) { }
+
                     cancel()
                     transport.connection.close()
                     awaitCancellation()

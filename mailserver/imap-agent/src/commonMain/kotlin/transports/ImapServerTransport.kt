@@ -38,9 +38,10 @@ class ImapServerTransport(var connection: Connection) {
 
                 commandPipeline.process(context)
             } catch (e: Exception) {
-                logger.error(e) { "imap transport stream encountered exception." }
+                logger.error(e) { "IMAP transport stream encountered an exception." }
 
                 cancel()
+                break
             }
         }
     }
@@ -54,7 +55,7 @@ class ImapServerTransport(var connection: Connection) {
     }
 
     suspend fun send(response: TaggedImapResponse) {
-        logger.trace { ">>> $response"}
+        logger.trace { "IMAP (${connection.remote}) >>> $response"}
         writer.writeResponse(response)
     }
 

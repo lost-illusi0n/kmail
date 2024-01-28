@@ -7,12 +7,20 @@ import dev.sitar.kmail.agents.smtp.transports.server.SmtpServerTransport
 import dev.sitar.kmail.message.Message
 import dev.sitar.kmail.smtp.*
 import dev.sitar.kmail.smtp.frames.replies.*
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import mu.KotlinLogging
+import java.lang.Exception
 
 private val logger = KotlinLogging.logger { }
+
+fun interface ServerSink {
+    suspend fun send(message: InternetMessage)
+}
 
 abstract class ServerConnection(val transport: SmtpServerTransport, private val domain: Domain, addresses: List<String>? = null) {
     abstract val extensions: Set<ServerExtension>
@@ -23,28 +31,25 @@ abstract class ServerConnection(val transport: SmtpServerTransport, private val 
 
     val allExtensions by lazy { extensions + setOf(EhloExtension(this, domain), QuitExtension(this), mail) }
 
-    suspend fun handle() {
+    suspend fun handleAndPipeTo(sink: ServerSink) = coroutineScope {
+        launch { transport.startPipeline() }
+
+        // send incoming email to the sink
+        incoming.onEach { sink.send(it) }.launchIn(this)
+
         transport.commandPipeline {
             filter(SmtpCommandPipeline.Logging) {
-                when (this) {
-                    is SmtpCommandContext.Known -> logger.trace { "FROM ${transport.remote}: $command" }
-                    is SmtpCommandContext.Unknown -> {
-                        logger.warn(cause) { "FROM ${transport.remote}: unknown!" }
-                        continuePropagation = false
-                        transport.send(SmtpReply.PermanentNegative.Default(code = 500))
-                        close()
-                    }
-                }
+                logger.trace { "SMTP (port: ) <<< $command" }
+            }
+
+            filter(SmtpCommandPipeline.After) {
+
             }
         }
 
-        allExtensions.forEach(ServerExtension::apply)
+        allExtensions.forEach { it.apply(this) }
 
         transport.send(GreetCompletion("${domain.asString()} ESMTP the revolutionary kmail :-)"))
-    }
-
-    fun close() {
-        transport.close()
     }
 }
 
@@ -53,21 +58,23 @@ interface ServerExtension {
 
     fun capabilities(): Set<String> = emptySet()
 
-    fun apply()
+    fun apply(scope: CoroutineScope)
 }
 
 class QuitExtension(override val server: ServerConnection): ServerExtension {
-    override fun apply() {
+    override fun apply(scope: CoroutineScope) {
         server.transport.commandPipeline {
-            filter(SmtpCommandPipeline.Process) {
-                require(this is SmtpCommandContext.Known)
-
+            filter(SmtpCommandPipeline.Processing) {
                 if (command is QuitCommand) {
-                    continuePropagation = false
+                    wasProcessed = true
 
-                    server.transport.send(SmtpReply.PositiveCompletion.Default(code = 221, lines = listOf("goodbye, thanks for mail.")))
+                    try {
+                        server.transport.send(SmtpReply.PositiveCompletion.Default(code = 221, lines = listOf("goodbye, thanks for mail.")))
+                    } catch (_: Exception) { }
 
-                    server.close()
+                    scope.cancel()
+                    server.transport.connection.close()
+                    awaitCancellation()
                 }
             }
         }
@@ -75,37 +82,35 @@ class QuitExtension(override val server: ServerConnection): ServerExtension {
 }
 
 class EhloExtension(override val server: ServerConnection, val domain: Domain): ServerExtension {
-    override fun apply() {
-        server.transport.commandPipeline.filter(SmtpCommandPipeline.Process) {
-            require(this is SmtpCommandContext.Known)
+    override fun apply(scope: CoroutineScope) {
+        server.transport.commandPipeline.filter(SmtpCommandPipeline.Processing) {
+            if (command !is EhloCommand) return@filter
 
-            if (command is EhloCommand) {
-                val capabilities = server.allExtensions.flatMap { it.capabilities() }
+            wasProcessed = true
 
-                server.transport.send(EhloCompletion(domain, "${domain.asString()} ESMTP the revolutionary kmail :-)", capabilities))
-            }
+            val capabilities = server.allExtensions.flatMap { it.capabilities() }
+
+            server.transport.send(EhloCompletion(domain, "${domain.asString()} ESMTP the revolutionary kmail :-)", capabilities))
         }
     }
 }
 
 class StartTlsExtension(override val server: ServerConnection): ServerExtension {
-    override fun apply() {
+    override fun apply(scope: CoroutineScope) {
         server.transport.commandPipeline {
-            filter(SmtpCommandPipeline.Process) {
-                require(this is SmtpCommandContext.Known)
+            filter(SmtpCommandPipeline.Processing) {
+                if (command !is StartTlsCommand) return@filter
 
-                if (command is StartTlsCommand) {
-                    require(!server.transport.isSecure)
-                    server.transport.send(ReadyToStartTlsCompletion("start tls."))
+                wasProcessed = true
 
-                    logger.debug { "Starting TLS negotiations. ${System.currentTimeMillis()}" }
+                require(!server.transport.isSecure)
+                server.transport.send(ReadyToStartTlsCompletion("start tls."))
 
-                    server.transport.secure()
+                logger.debug { "Starting TLS negotiations. ${System.currentTimeMillis()}" }
 
-                    logger.debug { "Upgraded connection to TLS. ${System.currentTimeMillis()}"}
+                server.transport.secure()
 
-                    continuePropagation = false
-                }
+                logger.debug { "Upgraded connection to TLS. ${System.currentTimeMillis()}"}
             }
         }
     }
@@ -128,41 +133,40 @@ class MailExtension(override val server: ServerConnection, val addresses: List<S
 
     private var state: State? = null
 
-    override fun apply() {
-        server.transport.scope.coroutineContext[Job]!!.invokeOnCompletion {
-            incoming.close(it)
-        }
+    override fun apply(scope: CoroutineScope) {
+        scope.coroutineContext.job.invokeOnCompletion { incoming.cancel() }
 
         // TODO: spam filtering???
         server.transport.commandPipeline {
-            filter(SmtpCommandPipeline.Process) {
-                require(this is SmtpCommandContext.Known)
-
+            filter(SmtpCommandPipeline.Processing) {
                 if (command !is MailCommand) return@filter
+
+                wasProcessed = true
 
                 state = State(command)
 
                 server.transport.send(OkCompletion("Ok."))
             }
 
-            filter(SmtpCommandPipeline.Process) {
-                require(this is SmtpCommandContext.Known)
-
+            filter(SmtpCommandPipeline.Processing) {
                 if (command !is RecipientCommand) return@filter
+
+                wasProcessed = true
 
                 if (addresses?.contains(command.to.mailbox.asText()) == false) {
                     server.transport.send(SmtpReply.PermanentNegative.Default(550, listOf("unknown user: ${command.to.mailbox.asText()}")))
                     return@filter
                 }
+
                 state!!.rcpts.add(command.to)
 
                 server.transport.send(OkCompletion("Ok."))
             }
 
-            filter(SmtpCommandPipeline.Process) {
-                require(this is SmtpCommandContext.Known)
-
+            filter(SmtpCommandPipeline.Processing) {
                 if (command !is DataCommand) return@filter
+
+                wasProcessed = true
 
                 server.transport.send(StartMailInputIntermediary("End message with <CR><LF>.<CR><LF>"))
 
